@@ -1,0 +1,24 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 26,
+        "patch": 2
+    },
+    "configurePresets": [
+        {
+            "name": "clang-libcxx-debug",
+            "displayName": "Clang + libc++ Debug",
+            "generator": "Ninja",
+            "toolchainFile": "${sourceDir}/cmake/toolchains/system-clang-libcxx.cmake",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "ENABLE_ADDRESS_SANITIZER": true
+            },
+            "warnings": {
+                "dev": false
+            }
+        }
+    ]
+}

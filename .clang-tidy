@@ -1,0 +1,15 @@
+---
+Checks: >
+    -*,
+    bugprone-*,
+    -bugprone-exception-escape,
+    cppcoreguidelines-*,
+    misc-*,
+    -misc-use-internal-linkage,
+    modernize-*,
+    performance-*,
+    readability-*,
+    -readability-identifier-length
+HeaderFilterRegex: '.'
+FormatStyle:     none
+User:            Linux

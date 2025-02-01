@@ -1,0 +1,6 @@
+{
+    "clangd.arguments": [
+        "--experimental-modules-support",
+        "--compile-commands-dir=build"
+    ]
+}
