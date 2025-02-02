@@ -18,8 +18,10 @@ if(NOT CMAKE_CXX_COMPILER_ID MATCHES Clang OR NOT CMAKE_SYSTEM_NAME STREQUAL Lin
 endif()
 
 # Additional compile/link flags
-add_compile_options(-g -Wall -Wextra -Werror -Wno-unused-parameter)
+add_compile_options(-g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-private-field -Wno-unused-function)
 include(cmake/Sanitizers.cmake)
+
+include(cmake/MagicEnum.cmake)
 
 add_subdirectory(src)
 
