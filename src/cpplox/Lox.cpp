@@ -1,10 +1,5 @@
-module;
-
-#include <cstdio> // for stderr
-
 export module cpplox:Lox;
 
-import :Scanner;
 import :exits;
 
 import std;
@@ -14,10 +9,16 @@ namespace cpplox {
 export class Lox
 {
 public:
+    static auto instance() -> Lox
+    {
+        static Lox lox;
+        return lox;
+    }
+
     auto execute(const std::vector<std::string_view> & args) -> ExitCode
     {
         if (args.size() > 1) {
-            std::println(stderr, "Usage: cpplox [script]");
+            std::println(std::cerr, "Usage: cpplox [script]");
             return cpplox::ExitCode::IncorrectUsage;
         }
         if (args.size() == 1) {
@@ -50,27 +51,19 @@ public:
         return ExitCode::Ok;
     }
 
-    auto error(int line, std::string_view message) -> void { report(line, "", message); }
+    auto error(std::size_t line, std::string_view message) -> void { report(line, "", message); }
 
 private:
-    auto run(std::string source) -> ExitCode
+    Lox() = default;
+
+    // Some internal modules called by run() (like Scanner) need to call into Lox::error() and
+    // Lox::report() methods, which forces us to move run() implementation into the implementation
+    // unit (see LoxImpl.cpp)
+    auto run(std::string source) -> ExitCode;
+
+    auto report(std::size_t line, std::string_view where, std::string_view message) -> void
     {
-        Scanner scanner(std::move(source));
-
-        for (auto token : scanner.scan_tokens()) {
-            std::println("Token: {}", token);
-        }
-
-        if (had_error) {
-            return ExitCode::IncorrectInput;
-        }
-
-        return ExitCode::Ok;
-    }
-
-    auto report(int line, std::string_view where, std::string_view message) -> void
-    {
-        std::println(stderr, "[line {}] Error{}: {}", line, where, message);
+        std::println(std::cerr, "[line {}] Error{}: {}", line, where, message);
         had_error = true;
     }
 

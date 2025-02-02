@@ -8,6 +8,6 @@ auto main(int argc, char * argv[]) -> int
             | std::views::transform([](char const * arg) { return std::string_view{arg}; })
             | std::ranges::to<std::vector>();
 
-    cpplox::Lox lox;
+    auto lox = cpplox::Lox::instance();
     cpplox::exit_program(lox.execute(args));
 }

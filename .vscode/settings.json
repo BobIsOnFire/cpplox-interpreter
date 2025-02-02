@@ -1,6 +1,10 @@
 {
     "clangd.arguments": [
         "--experimental-modules-support",
-        "--compile-commands-dir=build"
-    ]
+        "--header-insertion=never",
+        "--compile-commands-dir=build/sanitize_address"
+    ],
+    "[cpp]": {
+        "editor.formatOnSave": true
+    },
 }

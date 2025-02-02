@@ -6,9 +6,14 @@ target_sources(cpplox
       cpplox/Lox.cpp
       cpplox/Scanner.cpp
       cpplox/Token.cpp
+      cpplox/TokenType.cpp
       cpplox/exits.cpp
       cpplox.cppm
+  PRIVATE
+    cpplox/LoxImpl.cpp  
 )
+
+target_link_libraries(cpplox PRIVATE magic_enum)
 
 add_executable(cpplox-exe)
 

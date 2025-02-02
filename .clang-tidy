@@ -9,6 +9,7 @@ Checks: >
     modernize-*,
     performance-*,
     readability-*,
+    -readability-convert-member-functions-to-static,
     -readability-identifier-length
 HeaderFilterRegex: '.'
 FormatStyle:     none
