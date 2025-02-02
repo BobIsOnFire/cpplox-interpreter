@@ -1,4 +1,4 @@
-export module cpplox.Token;
+module cpplox:Token;
 
 import std;
 

@@ -1,5 +1,4 @@
-import cpplox.Lox;
-import cpplox.exits;
+import cpplox;
 
 import std;
 

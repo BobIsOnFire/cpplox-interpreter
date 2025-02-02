@@ -1,6 +1,6 @@
-export module cpplox.Scanner;
+module cpplox:Scanner;
 
-import cpplox.Token;
+import :Token;
 
 import std;
 

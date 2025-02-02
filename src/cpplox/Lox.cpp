@@ -2,10 +2,10 @@ module;
 
 #include <cstdio> // for stderr
 
-export module cpplox.Lox;
+export module cpplox:Lox;
 
-import cpplox.Scanner;
-import cpplox.exits;
+import :Scanner;
+import :exits;
 
 import std;
 
