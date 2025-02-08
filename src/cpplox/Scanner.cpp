@@ -30,7 +30,7 @@ public:
     {
     }
 
-    [[nodiscard]] auto scan_tokens() -> std::vector<Token>
+    [[nodiscard]] auto scan_tokens() [[clang::lifetimebound]] -> std::vector<Token>
     {
         while (!is_at_end()) {
             m_start = m_current;
