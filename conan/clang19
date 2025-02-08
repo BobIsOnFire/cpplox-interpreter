@@ -7,6 +7,9 @@ compiler.version = 19
 compiler.libcxx = libc++
 build_type = Debug
 
+# jinja2cpp doesn't compile with c++20 or c++23, downgrade cppstd for it
+jinja2cpp/*:compiler.cppstd = 17
+
 [conf]
 tools.cmake.cmake_layout:build_folder_vars += options.sanitize
 tools.cmake.cmaketoolchain:generator = Ninja Multi-Config

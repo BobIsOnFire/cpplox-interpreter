@@ -1,0 +1,26 @@
+module cpplox:Expr;
+
+import :Token;
+import std;
+
+namespace cpplox {
+
+export struct Expr {
+  {%- for elem in data.grammar %}
+    struct {{ elem.type }};
+  {%- endfor %}
+};
+
+{%- for elem in data.grammar %}
+struct Expr::{{ elem.type }} {
+  {%- for param in elem.params %}
+    {%- if param.type is defined %}
+      {{ param.type }} {{ param.name }};
+    {%- else %}
+      std::unique_ptr<Expr> {{ param.name }};
+    {%- endif %}
+  {%- endfor %}
+};
+{%- endfor %}
+
+} // namespace cpplox

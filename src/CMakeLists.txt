@@ -1,14 +1,35 @@
+find_package(jinja2cpp CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
+
+add_executable(grammar_generator)
+target_sources(grammar_generator PRIVATE grammar/generate.cpp)
+target_link_libraries(grammar_generator PRIVATE jinja2cpp nlohmann_json::nlohmann_json)
+
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
+  COMMAND grammar_generator
+    grammar/grammar.json
+    grammar/Expr.cpp.j2
+    ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
+  DEPENDS
+    grammar_generator
+    grammar/grammar.json
+    grammar/Expr.cpp.j2
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
 add_library(cpplox STATIC)
 
 target_sources(cpplox
   PUBLIC
     FILE_SET cxx_modules TYPE CXX_MODULES FILES 
+      ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
       cpplox/Lox.cpp
       cpplox/Scanner.cpp
       cpplox/Token.cpp
       cpplox/TokenType.cpp
       cpplox/exits.cpp
       cpplox.cppm
+    BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}
   PRIVATE
     cpplox/LoxImpl.cpp  
 )

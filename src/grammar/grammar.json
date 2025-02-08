@@ -1,0 +1,48 @@
+{
+    "grammar": [
+        {
+            "type": "Binary",
+            "params": [
+                {
+                    "name": "left"
+                },
+                {
+                    "name": "op",
+                    "type": "cpplox::Token"
+                },
+                {
+                    "name": "right"
+                }
+            ]
+        },
+        {
+            "type": "Grouping",
+            "params": [
+                {
+                    "name": "expr"
+                }
+            ]
+        },
+        {
+            "type": "Literal",
+            "params": [
+                {
+                    "name": "value",
+                    "type": "cpplox::Token::Literal"
+                }
+            ]
+        },
+        {
+            "type": "Unary",
+            "params": [
+                {
+                    "name": "op",
+                    "type": "cpplox::Token"
+                },
+                {
+                    "name": "right"
+                }
+            ]
+        }
+    ]
+}
