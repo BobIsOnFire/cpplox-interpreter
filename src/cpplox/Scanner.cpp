@@ -1,3 +1,7 @@
+module;
+
+#include <fast_float/fast_float.h>
+
 module cpplox:Scanner;
 
 import :Lox;
@@ -162,9 +166,14 @@ private:
             }
         }
 
-        // omg is there seriously no way to extract double without a string copy? std::from_chars is
-        // still not in libc++19
-        double num = std::stod(m_source.substr(m_start, m_current - m_start));
+        double num = 0;
+        auto answer = fast_float::from_chars(&m_source[m_start], &m_source[m_current], num);
+
+        if (answer.ec != std::errc()) {
+            error("Parsing failure");
+            return;
+        }
+
         add_token(TokenType::Number, num);
     }
 

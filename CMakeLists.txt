@@ -21,8 +21,6 @@ endif()
 add_compile_options(-g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-private-field -Wno-unused-function)
 include(cmake/Sanitizers.cmake)
 
-include(cmake/MagicEnum.cmake)
-
 add_subdirectory(src)
 
 enable_testing()

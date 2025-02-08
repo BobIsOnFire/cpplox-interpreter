@@ -13,7 +13,13 @@ target_sources(cpplox
     cpplox/LoxImpl.cpp  
 )
 
-target_link_libraries(cpplox PRIVATE magic_enum)
+find_package(FastFloat CONFIG REQUIRED)
+find_package(magic_enum CONFIG REQUIRED)
+
+target_link_libraries(cpplox PRIVATE
+  FastFloat::fast_float
+  magic_enum::magic_enum
+)
 
 add_executable(cpplox-exe)
 
