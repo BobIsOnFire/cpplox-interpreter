@@ -1,19 +1,18 @@
-#include <jinja2cpp/binding/nlohmann_json.h>
 #include <jinja2cpp/template.h>
-#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+
+import jinja2_yaml_binding;
 
 import std;
 
 auto main(int argc, char * argv[]) -> int
 {
     if (argc != 4) {
-        std::println(std::cerr, "Usage: grammar_generator <grammar_json> <template> <output>");
+        std::println(std::cerr, "Usage: grammar_generator <grammar_yaml> <template> <output>");
         std::exit(EXIT_FAILURE);
     }
 
-    std::ifstream grammar_file(argv[1]);
-    nlohmann::json grammar = nlohmann::json::parse(grammar_file);
-    grammar_file.close();
+    YAML::Node grammar = YAML::LoadFile(argv[1]);
 
     std::ifstream template_file(argv[2]);
     std::stringstream buffer;

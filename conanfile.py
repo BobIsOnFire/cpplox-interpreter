@@ -23,7 +23,7 @@ class HelloConan(ConanFile):
         self.requires("fast_float/7.0.0")
         self.requires("jinja2cpp/1.3.2")
         self.requires("magic_enum/0.9.7")
-        self.requires("nlohmann_json/3.11.2")
+        self.requires("yaml-cpp/0.8.0")
         self.requires("gtest/1.12.1", test=True)
         pass
 

@@ -5,14 +5,19 @@ import std;
 
 namespace cpplox {
 
-export struct Expr {
-  {%- for elem in data.grammar %}
-    struct {{ elem.type }};
-  {%- endfor %}
-};
-
+namespace expr {
 {%- for elem in data.grammar %}
-struct Expr::{{ elem.type }} {
+export struct {{ elem.type }}; 
+{%- endfor %}
+} // namespace expr
+
+export using Expr = std::variant<
+    expr::{{ data.grammar|map(attribute='type')|join(',\n    expr::') }}
+>;
+
+namespace expr {
+{%- for elem in data.grammar %}
+export struct {{ elem.type }} {
   {%- for param in elem.params %}
     {%- if param.type is defined %}
       {{ param.type }} {{ param.name }};
@@ -22,5 +27,6 @@ struct Expr::{{ elem.type }} {
   {%- endfor %}
 };
 {%- endfor %}
+} // namespace expr
 
 } // namespace cpplox

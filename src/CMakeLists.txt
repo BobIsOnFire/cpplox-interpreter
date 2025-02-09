@@ -1,18 +1,24 @@
 find_package(jinja2cpp CONFIG REQUIRED)
-find_package(nlohmann_json CONFIG REQUIRED)
+find_package(yaml-cpp CONFIG REQUIRED)
 
 add_executable(grammar_generator)
-target_sources(grammar_generator PRIVATE grammar/generate.cpp)
-target_link_libraries(grammar_generator PRIVATE jinja2cpp nlohmann_json::nlohmann_json)
+target_sources(grammar_generator
+  PRIVATE
+    FILE_SET cxx_modules TYPE CXX_MODULES FILES
+      grammar/jinja2_yaml_binding.cpp
+  PRIVATE 
+    grammar/generate.cpp
+)
+target_link_libraries(grammar_generator PRIVATE jinja2cpp yaml-cpp::yaml-cpp)
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
   COMMAND grammar_generator
-    grammar/grammar.json
+    grammar/grammar.yaml
     grammar/Expr.cpp.j2
     ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
   DEPENDS
     grammar_generator
-    grammar/grammar.json
+    grammar/grammar.yaml
     grammar/Expr.cpp.j2
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
