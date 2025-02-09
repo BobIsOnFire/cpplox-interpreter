@@ -1,3 +1,7 @@
+module;
+
+#include <vector> // WTF "vector must be defined before used"
+
 export module cpplox:Lox;
 
 import :exits;

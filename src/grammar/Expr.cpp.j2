@@ -29,4 +29,9 @@ export struct {{ elem.type }} {
 {%- endfor %}
 } // namespace expr
 
+template <class... Args> auto make_unique_expr(Args &&... args) -> std::unique_ptr<Expr>
+{
+    return std::make_unique<Expr>(std::forward<Args>(args)...);
+}
+
 } // namespace cpplox

@@ -27,6 +27,21 @@ public:
 
     friend class std::formatter<Token>;
 
+    [[nodiscard]] auto get_lexeme() const [[clang::lifetimebound]] -> std::string_view
+    {
+        return m_lexeme;
+    }
+
+    [[nodiscard]] auto get_type() const -> TokenType
+    {
+        return m_type;
+    }
+
+    [[nodiscard]] auto get_literal() const -> const Literal &
+    {
+        return m_literal;
+    }
+
 private:
     std::string_view m_lexeme;
     std::size_t m_line;
@@ -44,20 +59,28 @@ template <> struct std::formatter<cpplox::Token::EmptyLiteral> : std::formatter<
     }
 };
 
+template <> struct std::formatter<cpplox::Token::Literal> : std::formatter<std::string_view>
+{
+    constexpr auto parse(std::format_parse_context & ctx) { return ctx.begin(); }
+
+    auto format(const cpplox::Token::Literal & literal, std::format_context & ctx) const
+    {
+        return std::visit(
+                [&](const auto & value) { return std::format_to(ctx.out(), "{}", value); },
+                literal);
+    }
+};
+
 template <> struct std::formatter<cpplox::Token>
 {
     constexpr auto parse(std::format_parse_context & ctx) { return ctx.begin(); }
 
     auto format(const cpplox::Token & token, std::format_context & ctx) const
     {
-        return std::visit(
-                [&](const auto & literal) {
-                    return std::format_to(ctx.out(),
-                                          "Token(lexeme={}, type={}, literal={})",
-                                          token.m_lexeme,
-                                          token.m_type,
-                                          literal);
-                },
-                token.m_literal);
+        return std::format_to(ctx.out(),
+                              "Token(lexeme={}, type={}, literal={})",
+                              token.m_lexeme,
+                              token.m_type,
+                              token.m_literal);
     }
 };

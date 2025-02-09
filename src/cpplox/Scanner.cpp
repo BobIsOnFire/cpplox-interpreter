@@ -1,6 +1,7 @@
 module;
 
 #include <fast_float/fast_float.h>
+#include <vector> // WTF "vector must be defined before used"
 
 module cpplox:Scanner;
 

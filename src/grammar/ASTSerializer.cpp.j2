@@ -1,0 +1,76 @@
+module;
+
+#include <yaml-cpp/yaml.h>
+
+module cpplox:ASTSerializer;
+
+import :Expr;
+
+export namespace YAML {
+
+using YAML::Emitter;
+
+} // namespace YAML
+
+namespace cpplox {
+
+export class ASTSerializer
+{
+public:
+    auto emitter() const -> const YAML::Emitter &
+    {
+        return m_emitter;
+    }
+
+{%- for elem in data.grammar %}
+    auto operator()(const expr::{{ elem.type }} & expr) -> void
+    {
+        m_emitter << YAML::BeginMap;
+        m_emitter << YAML::Key << "type";
+        m_emitter << YAML::Value << "{{ elem.type }}";
+
+        m_emitter << YAML::Key << "params";
+        m_emitter << YAML::Value;
+        m_emitter << YAML::BeginMap;
+
+        {%- for param in elem.params %}
+        m_emitter << YAML::Key << "{{ param.name }}";
+        m_emitter << YAML::Value;
+
+        {%- if param.type is defined %}
+        this->operator()(expr.{{ param.name }});
+        {%- else %}
+        std::visit(*this, *expr.{{ param.name }});
+        {%- endif %}
+
+        {%- endfor %}
+
+        m_emitter << YAML::EndMap;
+        m_emitter << YAML::EndMap;
+    }
+{%- endfor %}
+
+    auto operator()(const Token& token) -> void
+    {
+        m_emitter << YAML::BeginMap;
+        m_emitter << YAML::Key << "type" << YAML::Value << std::format("{}", token.get_type());
+        m_emitter << YAML::Key << "lexeme" << YAML::Value << std::format("{}", token.get_lexeme());
+
+        if (!std::holds_alternative<Token::EmptyLiteral>(token.get_literal())) {
+            m_emitter << YAML::Key << "literal" << YAML::Value;
+            this->operator()(token.get_literal());
+        }
+
+        m_emitter << YAML::EndMap;
+    }
+
+    auto operator()(const Token::Literal& literal) -> void
+    {
+        m_emitter << std::format("{}", literal);
+    }
+
+private:
+    YAML::Emitter m_emitter;
+};
+
+} // namespace cpplox

@@ -11,17 +11,19 @@ target_sources(grammar_generator
 )
 target_link_libraries(grammar_generator PRIVATE jinja2cpp yaml-cpp::yaml-cpp)
 
-add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
-  COMMAND grammar_generator
-    grammar/grammar.yaml
-    grammar/Expr.cpp.j2
-    ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
-  DEPENDS
-    grammar_generator
-    grammar/grammar.yaml
-    grammar/Expr.cpp.j2
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
+foreach(source_name IN ITEMS Expr.cpp ASTSerializer.cpp)
+  add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
+    COMMAND grammar_generator
+      grammar/grammar.yaml
+      grammar/${source_name}.j2
+      ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
+    DEPENDS
+      grammar_generator
+      grammar/grammar.yaml
+      grammar/${source_name}.j2
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+endforeach()
 
 add_library(cpplox STATIC)
 
@@ -29,7 +31,9 @@ target_sources(cpplox
   PUBLIC
     FILE_SET cxx_modules TYPE CXX_MODULES FILES 
       ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
+      ${CMAKE_CURRENT_BINARY_DIR}/ASTSerializer.cpp
       cpplox/Lox.cpp
+      cpplox/PrettyPrinter.cpp
       cpplox/Scanner.cpp
       cpplox/Token.cpp
       cpplox/TokenType.cpp
@@ -46,6 +50,7 @@ find_package(magic_enum CONFIG REQUIRED)
 target_link_libraries(cpplox PRIVATE
   FastFloat::fast_float
   magic_enum::magic_enum
+  yaml-cpp::yaml-cpp
 )
 
 add_executable(cpplox-exe)
