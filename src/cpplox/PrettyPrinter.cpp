@@ -1,8 +1,9 @@
 module cpplox:PrettyPrinter;
 
+import std;
+
 import :Expr;
 import :Token;
-import std;
 
 namespace cpplox {
 

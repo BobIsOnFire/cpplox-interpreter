@@ -1,8 +1,5 @@
-#include <vector> // WTF "vector must be defined before used"
-
-import cpplox;
-
 import std;
+import cpplox;
 
 auto main(int argc, char * argv[]) -> int
 {

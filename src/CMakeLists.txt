@@ -1,6 +1,3 @@
-find_package(jinja2cpp CONFIG REQUIRED)
-find_package(yaml-cpp CONFIG REQUIRED)
-
 add_executable(grammar_generator)
 target_sources(grammar_generator
   PRIVATE
@@ -9,7 +6,7 @@ target_sources(grammar_generator
   PRIVATE 
     grammar/generate.cpp
 )
-target_link_libraries(grammar_generator PRIVATE jinja2cpp yaml-cpp::yaml-cpp)
+target_link_libraries(grammar_generator PRIVATE jinja2cpp-mod yaml-cpp-mod)
 
 foreach(source_name IN ITEMS Expr.cpp ASTSerializer.cpp)
   add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
@@ -44,13 +41,10 @@ target_sources(cpplox
     cpplox/LoxImpl.cpp  
 )
 
-find_package(FastFloat CONFIG REQUIRED)
-find_package(magic_enum CONFIG REQUIRED)
-
 target_link_libraries(cpplox PRIVATE
-  FastFloat::fast_float
-  magic_enum::magic_enum
-  yaml-cpp::yaml-cpp
+  fast_float-mod
+  magic_enum-mod
+  yaml-cpp-mod
 )
 
 add_executable(cpplox-exe)

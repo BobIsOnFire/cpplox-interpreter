@@ -1,16 +1,8 @@
-module;
-
-#include <yaml-cpp/yaml.h>
-
 module cpplox:ASTSerializer;
 
+import yaml_cpp;
+
 import :Expr;
-
-export namespace YAML {
-
-using YAML::Emitter;
-
-} // namespace YAML
 
 namespace cpplox {
 

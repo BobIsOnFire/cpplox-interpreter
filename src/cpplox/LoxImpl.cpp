@@ -1,9 +1,9 @@
 module cpplox;
 
+import std;
+
 import :Scanner;
 import :exits;
-
-import std;
 
 namespace cpplox {
 

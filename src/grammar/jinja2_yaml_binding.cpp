@@ -1,15 +1,10 @@
-module;
-
-#include <jinja2cpp/reflected_value.h>
-#include <yaml-cpp/yaml.h>
-
 export module jinja2_yaml_binding;
 
-export namespace jinja2 {
+import jinja2cpp;
+import yaml_cpp;
 
-using jinja2::Reflect;
-
-}
+import std;
+import std.compat;
 
 namespace jinja2::detail {
 

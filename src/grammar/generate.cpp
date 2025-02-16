@@ -1,7 +1,7 @@
-#include <jinja2cpp/template.h>
-#include <yaml-cpp/yaml.h>
-
 import jinja2_yaml_binding;
+
+import jinja2cpp;
+import yaml_cpp;
 
 import std;
 
@@ -9,7 +9,7 @@ auto main(int argc, char * argv[]) -> int
 {
     if (argc != 4) {
         std::println(std::cerr, "Usage: grammar_generator <grammar_yaml> <template> <output>");
-        std::exit(EXIT_FAILURE);
+        std::exit(1);
     }
 
     YAML::Node grammar = YAML::LoadFile(argv[1]);

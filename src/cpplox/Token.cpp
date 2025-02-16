@@ -1,8 +1,8 @@
 module cpplox:Token;
 
-import :TokenType;
-
 import std;
+
+import :TokenType;
 
 namespace cpplox {
 
@@ -32,15 +32,9 @@ public:
         return m_lexeme;
     }
 
-    [[nodiscard]] auto get_type() const -> TokenType
-    {
-        return m_type;
-    }
+    [[nodiscard]] auto get_type() const -> TokenType { return m_type; }
 
-    [[nodiscard]] auto get_literal() const -> const Literal &
-    {
-        return m_literal;
-    }
+    [[nodiscard]] auto get_literal() const -> const Literal & { return m_literal; }
 
 private:
     std::string_view m_lexeme;

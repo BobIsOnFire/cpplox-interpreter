@@ -1,10 +1,8 @@
-module;
-
-#include <magic_enum/magic_enum.hpp>
-
 module cpplox:TokenType;
 
 import std;
+
+import magic_enum;
 
 namespace cpplox {
 
