@@ -1,6 +1,7 @@
 {
+    "clangd.path": "/home/nikitoss/llvm-dist/bin/clangd",
     "clangd.arguments": [
-        "--experimental-modules-support",
+        // "--experimental-modules-support",
         "--header-insertion=never",
         "--compile-commands-dir=build/sanitize_address"
     ],

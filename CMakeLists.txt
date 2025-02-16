@@ -21,6 +21,10 @@ endif()
 add_compile_options(-g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-private-field -Wno-unused-function)
 include(cmake/Sanitizers.cmake)
 
+execute_process(COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libc++.so OUTPUT_VARIABLE libcxx_path)
+cmake_path(GET libcxx_path PARENT_PATH libcxx_dir)
+add_link_options(LINKER:-rpath,${libcxx_dir})
+
 add_subdirectory(thd-modules)
 
 add_subdirectory(src)
