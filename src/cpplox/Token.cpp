@@ -12,7 +12,7 @@ public:
     struct EmptyLiteral
     {
     };
-    using Literal = std::variant<std::string, double, EmptyLiteral>;
+    using Literal = std::variant<std::string, double, bool, std::nullptr_t, EmptyLiteral>;
 
     Token(std::string_view lexeme,
           std::size_t line,
@@ -31,6 +31,8 @@ public:
     {
         return m_lexeme;
     }
+
+    [[nodiscard]] auto get_line() const -> std::size_t { return m_line; }
 
     [[nodiscard]] auto get_type() const -> TokenType { return m_type; }
 

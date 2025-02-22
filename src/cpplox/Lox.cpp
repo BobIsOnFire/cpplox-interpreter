@@ -4,6 +4,13 @@ import std;
 
 import :exits;
 
+// FIXME: Lox is external interpreter class, called outside of implementation, but it provides
+// error() method for library impl to call into. Move error() into a subclass.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimport-implementation-partition-unit-in-interface-unit"
+import :Token;
+#pragma clang diagnostic pop
+
 namespace cpplox {
 
 export class Lox
@@ -49,6 +56,16 @@ public:
         }
         std::println("\nexit");
         return ExitCode::Ok;
+    }
+
+    auto error(const Token & token, std::string_view message) -> void
+    {
+        if (token.get_type() == TokenType::EndOfFile) {
+            report(token.get_line(), " at end", message);
+        }
+        else {
+            report(token.get_line(), std::format(" at '{}'", token.get_lexeme()), message);
+        }
     }
 
     auto error(std::size_t line, std::string_view message) -> void { report(line, "", message); }

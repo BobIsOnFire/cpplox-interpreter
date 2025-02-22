@@ -30,9 +30,10 @@ export struct {{ elem.type }} {
 {%- endfor %}
 } // namespace expr
 
-template <class... Args> auto make_unique_expr(Args &&... args) -> std::unique_ptr<Expr>
+template <class ExprT, class... Args>
+auto make_unique_expr(Args &&... args) -> std::unique_ptr<Expr>
 {
-    return std::make_unique<Expr>(std::forward<Args>(args)...);
+    return std::make_unique<Expr>(std::in_place_type<ExprT>, std::forward<Args>(args)...);
 }
 
 } // namespace cpplox
