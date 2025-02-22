@@ -8,5 +8,5 @@ auto main(int argc, char * argv[]) -> int
             | std::ranges::to<std::vector>();
 
     auto lox = cpplox::Lox::instance();
-    cpplox::exit_program(lox.execute(args));
+    cpplox::exit_program(lox->execute(args));
 }

@@ -29,6 +29,7 @@ target_sources(cpplox
     FILE_SET cxx_modules TYPE CXX_MODULES FILES 
       ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
       ${CMAKE_CURRENT_BINARY_DIR}/ASTSerializer.cpp
+      cpplox/Interpreter.cpp
       cpplox/Lox.cpp
       cpplox/Parser.cpp
       cpplox/PrettyPrinter.cpp

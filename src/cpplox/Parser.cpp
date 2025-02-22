@@ -88,7 +88,7 @@ private:
 
     auto error(const Token & token, std::string_view message) -> ParserError
     {
-        Lox::instance().error(token, message);
+        Lox::instance()->error(token, message);
         return ParserError(message);
     }
 

@@ -16,10 +16,10 @@ namespace cpplox {
 export class Lox
 {
 public:
-    static auto instance() -> Lox
+    static auto instance() -> Lox *
     {
         static Lox lox;
-        return lox;
+        return &lox;
     }
 
     auto execute(const std::vector<std::string_view> & args) -> ExitCode

@@ -2,7 +2,8 @@ module cpplox;
 
 import std;
 
-import :ASTSerializer;
+// import :ASTSerializer;
+import :Interpreter;
 import :Parser;
 import :Scanner;
 import :exits;
@@ -24,10 +25,15 @@ auto Lox::run(std::string source) -> ExitCode
         return ExitCode::IncorrectInput;
     }
 
-    ASTSerializer serializer;
-    std::visit(serializer, *expression);
+    Interpreter interpreter;
+    auto result = std::visit(interpreter, *expression);
 
-    std::println("{}", serializer.emitter().c_str());
+    std::println("{}", result);
+
+    // ASTSerializer serializer;
+    // std::visit(serializer, *expression);
+
+    // std::println("{}", serializer.emitter().c_str());
 
     return ExitCode::Ok;
 }
