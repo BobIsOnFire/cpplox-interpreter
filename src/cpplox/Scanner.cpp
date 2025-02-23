@@ -4,7 +4,7 @@ import std;
 
 import fast_float;
 
-import :Lox;
+import :Diagnostics;
 import :Token;
 
 namespace cpplox {
@@ -219,7 +219,10 @@ private:
         return std::string_view{m_source}.substr(m_start, m_current - m_start);
     }
 
-    auto error(std::string_view message) const -> void { Lox::instance()->error(m_line, message); }
+    auto error(std::string_view message) const -> void
+    {
+        Diagnostics::instance()->error(m_line, message);
+    }
 
     std::string m_source;
     std::vector<Token> m_tokens;

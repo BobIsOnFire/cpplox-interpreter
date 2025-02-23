@@ -3,6 +3,7 @@ module cpplox;
 import std;
 
 // import :ASTSerializer;
+import :Diagnostics;
 import :Interpreter;
 import :Parser;
 import :Scanner;
@@ -14,21 +15,21 @@ auto Lox::run(std::string source) -> ExitCode
 {
     Scanner scanner(std::move(source));
     auto tokens = scanner.scan_tokens();
-    if (had_error) {
+    if (Diagnostics::instance()->has_errors()) {
         return ExitCode::IncorrectInput;
     }
 
     Parser parser(std::move(tokens));
     auto expression = parser.parse();
 
-    if (had_error) {
+    if (Diagnostics::instance()->has_errors()) {
         return ExitCode::IncorrectInput;
     }
 
     auto * interpreter = Interpreter::instance();
     interpreter->interpret(*expression);
 
-    if (had_runtime_error) {
+    if (Diagnostics::instance()->has_runtime_errors()) {
         return ExitCode::SoftwareError;
     }
 

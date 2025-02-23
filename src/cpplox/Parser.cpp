@@ -3,7 +3,7 @@ module cpplox:Parser;
 import std;
 
 import :Expr;
-import :Lox;
+import :Diagnostics;
 import :ParserError;
 import :Token;
 
@@ -81,7 +81,7 @@ private:
 
     auto error(const Token & token, std::string_view message) -> ParserError
     {
-        Lox::instance()->error(token, message);
+        Diagnostics::instance()->error(token, message);
         return ParserError(message);
     }
 

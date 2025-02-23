@@ -2,8 +2,8 @@ module cpplox:Interpreter;
 
 import std;
 
+import :Diagnostics;
 import :Expr;
-import :Lox;
 import :RuntimeError;
 import :Token;
 
@@ -155,7 +155,7 @@ auto Interpreter::interpret(const Expr & expr) -> void
         std::println("{}", value);
     }
     catch (const RuntimeError & err) {
-        Lox::instance()->runtime_error(err);
+        Diagnostics::instance()->runtime_error(err);
     }
 }
 
