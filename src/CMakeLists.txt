@@ -45,6 +45,7 @@ target_sources(cpplox
       ${CMAKE_CURRENT_BINARY_DIR}/ExprSerializer.cpp
       ${CMAKE_CURRENT_BINARY_DIR}/Stmt.cpp
       cpplox/Diagnostics.cpp
+      cpplox/Environment.cpp
       cpplox/ExprOperandConverter.cpp
       cpplox/Interpreter.cpp
       cpplox/Lox.cpp

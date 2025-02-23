@@ -3,6 +3,7 @@ module cpplox:Interpreter;
 import std;
 
 import :Diagnostics;
+import :Environment;
 import :Expr;
 import :ExprOperandConverter;
 import :RuntimeError;
@@ -42,14 +43,23 @@ public:
         }
     }
 
+    auto evaluate(const Expr & expr) -> Value { return std::visit(*this, expr); }
+
     // statements
 
-    auto operator()(const stmt::Print & stmt) -> void
-    {
-        std::println("{}", std::visit(*this, *stmt.expr));
-    }
+    auto operator()(const stmt::Print & stmt) -> void { std::println("{}", evaluate(*stmt.expr)); }
 
-    auto operator()(const stmt::Expression & stmt) -> void { std::visit(*this, *stmt.expr); }
+    auto operator()(const stmt::Expression & stmt) -> void { evaluate(*stmt.expr); }
+
+    auto operator()(const stmt::Var & stmt) -> void
+    {
+        Value value = ValueTypes::Null{};
+        if (stmt.init.has_value()) {
+            value = evaluate(*stmt.init.value());
+        }
+
+        m_env.define(stmt.name.get_lexeme(), value);
+    }
 
     // expressions
 
@@ -64,13 +74,13 @@ public:
         return std::visit(visitor, expr.value);
     }
 
-    auto operator()(const expr::Grouping & expr) -> Value { return std::visit(*this, *expr.expr); }
+    auto operator()(const expr::Grouping & expr) -> Value { return evaluate(*expr.expr); }
 
     auto operator()(const expr::Unary & expr) -> Value
     {
         using enum TokenType;
 
-        auto right = std::visit(*this, *expr.right);
+        auto right = evaluate(*expr.right);
 
         ExprOperandConverter conv(expr.op);
 
@@ -85,8 +95,8 @@ public:
     {
         using enum TokenType;
 
-        auto left = std::visit(*this, *expr.left);
-        auto right = std::visit(*this, *expr.right);
+        auto left = evaluate(*expr.left);
+        auto right = evaluate(*expr.right);
 
         ExprOperandConverter conv(expr.op);
 
@@ -117,6 +127,8 @@ public:
         }
     }
 
+    auto operator()(const expr::Variable & expr) -> Value { return m_env.get(expr.name); }
+
 private:
     auto is_truthy(const Value & val) -> bool
     {
@@ -128,6 +140,8 @@ private:
 
         return std::visit(visitor, val);
     }
+
+    Environment m_env;
 };
 
 } // namespace cpplox

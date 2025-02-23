@@ -30,6 +30,11 @@ public:
         return parenthesize(expr.op.get_lexeme(), *expr.right);
     }
 
+    auto operator()(const expr::Variable & expr) -> std::string
+    {
+        return std::format("var {}", expr.name.get_literal());
+    }
+
 private:
     template <class... Exprs>
     auto parenthesize(std::string_view name, const Exprs &... exprs) -> std::string

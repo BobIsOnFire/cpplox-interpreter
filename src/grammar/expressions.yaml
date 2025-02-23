@@ -18,3 +18,7 @@ grammar:
   params:
   - { name: op, type: cpplox::Token }
   - { name: right }
+
+- type: Variable
+  params:
+  - { name: name, type: cpplox::Token }

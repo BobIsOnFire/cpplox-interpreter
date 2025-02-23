@@ -14,12 +14,12 @@ namespace cpplox {
 auto Lox::run(std::string source) -> ExitCode
 {
     Scanner scanner(std::move(source));
-    auto tokens = scanner.scan_tokens();
+    const auto & tokens = scanner.scan_tokens();
     if (Diagnostics::instance()->has_errors()) {
         return ExitCode::IncorrectInput;
     }
 
-    Parser parser(std::move(tokens));
+    Parser parser(tokens);
     auto statements = parser.parse();
 
     if (Diagnostics::instance()->has_errors()) {

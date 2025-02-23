@@ -28,7 +28,7 @@ public:
     {
     }
 
-    [[nodiscard]] auto scan_tokens() [[clang::lifetimebound]] -> std::vector<Token>
+    [[nodiscard]] auto scan_tokens() -> const std::vector<Token> &
     {
         while (!is_at_end()) {
             m_start = m_current;
@@ -211,7 +211,7 @@ private:
 
     auto add_token(TokenType type, Token::Literal literal = Token::EmptyLiteral{}) -> void
     {
-        m_tokens.emplace_back(get_lexeme(), m_line, type, std::move(literal));
+        m_tokens.emplace_back(std::string{get_lexeme()}, m_line, type, std::move(literal));
     }
 
     [[nodiscard]] auto get_lexeme() const -> std::string_view

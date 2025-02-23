@@ -14,8 +14,8 @@ namespace cpplox {
 export class Parser
 {
 public:
-    explicit Parser(std::vector<Token> tokens)
-        : m_tokens(std::move(tokens))
+    explicit Parser(std::span<const Token> tokens)
+        : m_tokens(tokens)
     {
     }
 
@@ -23,7 +23,10 @@ public:
     {
         std::vector<StmtPtr> stmts;
         while (!is_at_end()) {
-            stmts.push_back(statement());
+            auto decl = declaration();
+            if (decl.has_value()) {
+                stmts.push_back(std::move(decl).value());
+            }
         }
         return stmts;
     }
@@ -111,6 +114,34 @@ private:
 
     // This is recursive-descent parser, duh!
     // NOLINTBEGIN(misc-no-recursion)
+
+    auto declaration() noexcept -> std::optional<StmtPtr>
+    {
+        try {
+            if (match(Var)) {
+                return var_declaration();
+            }
+
+            return statement();
+        }
+        catch (const ParserError & error) {
+            synchronize();
+            return std::nullopt;
+        }
+    }
+
+    auto var_declaration() -> StmtPtr
+    {
+        const auto & name = consume(Identifier, "Expect variable name.");
+
+        std::optional<ExprPtr> init = std::nullopt;
+        if (match(Equal)) {
+            init = expression();
+        }
+
+        consume(Semicolon, "Expect ';' after variable declaration.");
+        return make_unique_stmt<stmt::Var>(name, std::move(init));
+    }
 
     auto statement() -> StmtPtr
     {
@@ -200,6 +231,10 @@ private:
             return make_unique_expr<expr::Literal>(previous().get_literal());
         }
 
+        if (match(Identifier)) {
+            return make_unique_expr<expr::Variable>(previous());
+        }
+
         if (match(LeftParenthesis)) {
             auto expr = expression();
             consume(RightParenthesis, "Expect ')' after expression.");
@@ -211,7 +246,7 @@ private:
 
     // NOLINTEND(misc-no-recursion)
 
-    std::vector<Token> m_tokens;
+    std::span<const Token> m_tokens;
     std::size_t m_current = 0;
 };
 

@@ -22,11 +22,8 @@ public:
     using Literal
             = std::variant<StringLiteral, NumberLiteral, BooleanLiteral, NullLiteral, EmptyLiteral>;
 
-    Token(std::string_view lexeme,
-          std::size_t line,
-          TokenType type,
-          Literal literal = EmptyLiteral{})
-        : m_lexeme(lexeme)
+    Token(std::string lexeme, std::size_t line, TokenType type, Literal literal = EmptyLiteral{})
+        : m_lexeme(std::move(lexeme))
         , m_line(line)
         , m_type(type)
         , m_literal(std::move(literal))
@@ -35,10 +32,7 @@ public:
 
     friend class std::formatter<Token>;
 
-    [[nodiscard]] auto get_lexeme() const [[clang::lifetimebound]] -> std::string_view
-    {
-        return m_lexeme;
-    }
+    [[nodiscard]] auto get_lexeme() const -> const std::string & { return m_lexeme; }
 
     [[nodiscard]] auto get_line() const -> std::size_t { return m_line; }
 
@@ -47,7 +41,7 @@ public:
     [[nodiscard]] auto get_literal() const -> const Literal & { return m_literal; }
 
 private:
-    std::string_view m_lexeme;
+    std::string m_lexeme;
     std::size_t m_line;
     TokenType m_type;
     Literal m_literal;

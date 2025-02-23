@@ -2,8 +2,13 @@ grammar:
 
 - type: Expression
   params:
-  - { name: expr, type: ExprPtr }
+  - { name: expr, type: cpplox::ExprPtr }
 
 - type: Print
   params:
-  - { name: expr, type: ExprPtr }
+  - { name: expr, type: cpplox::ExprPtr }
+
+- type: Var
+  params:
+  - { name: name, type: cpplox::Token }
+  - { name: init, type: std::optional<cpplox::ExprPtr> }
