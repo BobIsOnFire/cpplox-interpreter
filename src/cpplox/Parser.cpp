@@ -4,6 +4,7 @@ import std;
 
 import :Expr;
 import :Lox;
+import :ParserError;
 import :Token;
 
 using enum cpplox::TokenType;
@@ -29,14 +30,6 @@ public:
     }
 
 private:
-    struct ParserError : public std::runtime_error
-    {
-        explicit ParserError(std::string_view what = "")
-            : std::runtime_error(what.data())
-        {
-        }
-    };
-
     [[nodiscard]] auto is_at_end() const -> bool
     {
         return peek().get_type() == TokenType::EndOfFile;
@@ -177,7 +170,7 @@ private:
             return make_unique_expr<expr::Literal>(true);
         }
 
-        if (match(True)) {
+        if (match(Nil)) {
             return make_unique_expr<expr::Literal>(nullptr);
         }
 

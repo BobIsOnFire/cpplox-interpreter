@@ -3,9 +3,9 @@ module cpplox:Interpreter;
 import std;
 
 import :Expr;
+import :Lox;
+import :RuntimeError;
 import :Token;
-
-namespace cpplox {
 
 namespace {
 
@@ -17,10 +17,20 @@ template <class... Ts> struct overloads : Ts...
 
 } // namespace
 
+namespace cpplox {
+
 export class Interpreter
 {
 public:
     using Object = std::variant<std::string, double, bool, std::nullptr_t>;
+
+    static auto instance() -> Interpreter *
+    {
+        static Interpreter s_instance;
+        return &s_instance;
+    }
+
+    auto interpret(const Expr & expr) -> void;
 
     auto operator()(const expr::Literal & expr) -> Object
     {
@@ -41,12 +51,10 @@ public:
         auto right = std::visit(*this, *expr.right);
 
         switch (expr.op.get_type()) {
-        case Bang: return is_truthy(right);
-        case Minus: return -std::get<double>(right);
-        default: // ???
+        case Bang: return !is_truthy(right);
+        case Minus: return -as_number(right, expr.op);
+        default: throw RuntimeError(expr.op, "Unsupported unary operator.");
         }
-
-        std::unreachable();
     }
 
     auto operator()(const expr::Binary & expr) -> Object
@@ -57,31 +65,30 @@ public:
         auto right = std::visit(*this, *expr.right);
 
         switch (expr.op.get_type()) {
-        case Minus: return std::get<double>(left) - std::get<double>(right);
-        case Slash: return std::get<double>(left) / std::get<double>(right);
-        case Star: return std::get<double>(left) * std::get<double>(right);
+        case Minus: return as_number(left, expr.op) - as_number(right, expr.op);
+        case Slash: return as_number(left, expr.op) / as_number(right, expr.op);
+        case Star: return as_number(left, expr.op) * as_number(right, expr.op);
 
         case Plus:
             if (std::holds_alternative<double>(left)) {
-                return std::get<double>(left) + std::get<double>(right);
+                return as_number(left, expr.op) + as_number(right, expr.op);
             }
-            else {
-                std::get<std::string>(left).append(std::get<std::string>(right));
+            else if (std::holds_alternative<std::string>(left)) {
+                as_string(left, expr.op).append(as_string(right, expr.op));
                 return left;
             }
+            throw RuntimeError(expr.op, "Operands must be numbers or strings.");
 
-        case Greater: return std::get<double>(left) > std::get<double>(right);
-        case GreaterEqual: return std::get<double>(left) >= std::get<double>(right);
-        case Less: return std::get<double>(left) < std::get<double>(right);
-        case LessEqual: return std::get<double>(left) <= std::get<double>(right);
+        case Greater: return as_number(left, expr.op) > as_number(right, expr.op);
+        case GreaterEqual: return as_number(left, expr.op) >= as_number(right, expr.op);
+        case Less: return as_number(left, expr.op) < as_number(right, expr.op);
+        case LessEqual: return as_number(left, expr.op) <= as_number(right, expr.op);
 
         case BangEqual: return left != right;
         case EqualEqual: return left == right;
 
-        default: // ???
+        default: throw RuntimeError(expr.op, "Unsupported binary operator.");
         }
-
-        return left;
     }
 
 private:
@@ -100,6 +107,27 @@ private:
 
         return std::visit(visitor, obj);
     }
+
+    auto as_number(Object & obj, const Token & token) -> double &
+    {
+        return as<double>(obj, token, "Operand must be a number.");
+    }
+
+    auto as_string(Object & obj, const Token & token) -> std::string &
+    {
+        return as<std::string>(obj, token, "Operand must be a string.");
+    }
+
+    template <typename T>
+    auto as(Object & obj, const Token & token, std::string_view error_message) -> T &
+    {
+        try {
+            return std::get<T>(obj);
+        }
+        catch (std::bad_variant_access &) {
+            throw RuntimeError(token, error_message);
+        }
+    }
 };
 
 } // namespace cpplox
@@ -110,7 +138,25 @@ template <> struct std::formatter<cpplox::Interpreter::Object> : std::formatter<
 
     auto format(const cpplox::Interpreter::Object & obj, std::format_context & ctx) const
     {
-        return std::visit(
-                [&](const auto & value) { return std::format_to(ctx.out(), "{}", value); }, obj);
+        const auto formatter = overloads{
+                [&](std::nullptr_t) { return std::format_to(ctx.out(), "nil"); },
+                [&](const auto & value) { return std::format_to(ctx.out(), "{}", value); }};
+
+        return std::visit(formatter, obj);
     }
 };
+
+namespace cpplox {
+
+auto Interpreter::interpret(const Expr & expr) -> void
+{
+    try {
+        auto value = std::visit(*this, expr);
+        std::println("{}", value);
+    }
+    catch (const RuntimeError & err) {
+        Lox::instance()->runtime_error(err);
+    }
+}
+
+} // namespace cpplox

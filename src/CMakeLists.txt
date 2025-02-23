@@ -32,7 +32,9 @@ target_sources(cpplox
       cpplox/Interpreter.cpp
       cpplox/Lox.cpp
       cpplox/Parser.cpp
+      cpplox/ParserError.cpp
       cpplox/PrettyPrinter.cpp
+      cpplox/RuntimeError.cpp
       cpplox/Scanner.cpp
       cpplox/Token.cpp
       cpplox/TokenType.cpp

@@ -8,6 +8,7 @@ import :exits;
 // error() method for library impl to call into. Move error() into a subclass.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wimport-implementation-partition-unit-in-interface-unit"
+import :RuntimeError;
 import :Token;
 #pragma clang diagnostic pop
 
@@ -18,8 +19,8 @@ export class Lox
 public:
     static auto instance() -> Lox *
     {
-        static Lox lox;
-        return &lox;
+        static Lox s_instance;
+        return &s_instance;
     }
 
     auto execute(const std::vector<std::string_view> & args) -> ExitCode
@@ -48,11 +49,7 @@ public:
     auto run_prompt() -> ExitCode
     {
         for (std::string line; std::print("> "), std::getline(std::cin, line);) {
-            auto code = run(line);
-            if (code != ExitCode::Ok) {
-                std::println("\nexit");
-                return code;
-            }
+            [[maybe_unused]] auto code = run(line);
         }
         std::println("\nexit");
         return ExitCode::Ok;
@@ -70,13 +67,19 @@ public:
 
     auto error(std::size_t line, std::string_view message) -> void { report(line, "", message); }
 
+    auto runtime_error(const RuntimeError & error) -> void
+    {
+        std::println(std::cerr, "{}\n[line {}]", error.what(), error.get_token().get_line());
+        had_runtime_error = true;
+    }
+
 private:
     Lox() = default;
 
     // Some internal modules called by run() (like Scanner) need to call into Lox::error() and
     // Lox::report() methods, which forces us to move run() implementation into the implementation
     // unit (see LoxImpl.cpp)
-    auto run(std::string source) -> ExitCode;
+    [[nodiscard]] auto run(std::string source) -> ExitCode;
 
     auto report(std::size_t line, std::string_view where, std::string_view message) -> void
     {
@@ -85,6 +88,7 @@ private:
     }
 
     bool had_error = false;
+    bool had_runtime_error = false;
 };
 
 } // namespace cpplox

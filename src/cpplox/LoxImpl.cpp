@@ -25,15 +25,12 @@ auto Lox::run(std::string source) -> ExitCode
         return ExitCode::IncorrectInput;
     }
 
-    Interpreter interpreter;
-    auto result = std::visit(interpreter, *expression);
+    auto * interpreter = Interpreter::instance();
+    interpreter->interpret(*expression);
 
-    std::println("{}", result);
-
-    // ASTSerializer serializer;
-    // std::visit(serializer, *expression);
-
-    // std::println("{}", serializer.emitter().c_str());
+    if (had_runtime_error) {
+        return ExitCode::SoftwareError;
+    }
 
     return ExitCode::Ok;
 }

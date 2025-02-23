@@ -9,6 +9,7 @@ export enum class ExitCode : std::uint8_t {
     // From sysexits(3)
     IncorrectUsage = 64,
     IncorrectInput = 65,
+    SoftwareError = 70,
 };
 
 export [[noreturn]] auto exit_program(ExitCode code) -> void { std::exit(static_cast<int>(code)); }
