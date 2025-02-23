@@ -30,6 +30,7 @@ target_sources(cpplox
       ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
       ${CMAKE_CURRENT_BINARY_DIR}/ASTSerializer.cpp
       cpplox/Diagnostics.cpp
+      cpplox/ExprOperandConverter.cpp
       cpplox/Interpreter.cpp
       cpplox/Lox.cpp
       cpplox/Parser.cpp
@@ -39,6 +40,7 @@ target_sources(cpplox
       cpplox/Scanner.cpp
       cpplox/Token.cpp
       cpplox/TokenType.cpp
+      cpplox/Value.cpp
       cpplox/exits.cpp
       cpplox.cppm
     BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}
