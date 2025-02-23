@@ -20,8 +20,7 @@ template <class... Ts> struct overloads : Ts...
 export class Interpreter
 {
 public:
-    using ObjectData = std::variant<std::string, double, bool, std::nullptr_t>;
-    using Object = std::unique_ptr<ObjectData>;
+    using Object = std::variant<std::string, double, bool, std::nullptr_t>;
 
     auto operator()(const expr::Literal & expr) -> Object
     {
@@ -42,12 +41,12 @@ public:
         auto right = std::visit(*this, *expr.right);
 
         switch (expr.op.get_type()) {
-        case Bang: *right = is_truthy(right); break;
-        case Minus: *right = std::get<double>(*right); break;
+        case Bang: return is_truthy(right);
+        case Minus: return -std::get<double>(right);
         default: // ???
         }
 
-        return right;
+        std::unreachable();
     }
 
     auto operator()(const expr::Binary & expr) -> Object
@@ -58,26 +57,26 @@ public:
         auto right = std::visit(*this, *expr.right);
 
         switch (expr.op.get_type()) {
-        case Minus: *left = std::get<double>(*left) - std::get<double>(*right); break;
-        case Slash: *left = std::get<double>(*left) / std::get<double>(*right); break;
-        case Star: *left = std::get<double>(*left) * std::get<double>(*right); break;
+        case Minus: return std::get<double>(left) - std::get<double>(right);
+        case Slash: return std::get<double>(left) / std::get<double>(right);
+        case Star: return std::get<double>(left) * std::get<double>(right);
 
         case Plus:
-            if (std::holds_alternative<double>(*left)) {
-                *left = std::get<double>(*left) + std::get<double>(*right);
+            if (std::holds_alternative<double>(left)) {
+                return std::get<double>(left) + std::get<double>(right);
             }
             else {
-                std::get<std::string>(*left).append(std::get<std::string>(*right));
+                std::get<std::string>(left).append(std::get<std::string>(right));
+                return left;
             }
-            break;
 
-        case Greater: *left = std::get<double>(*left) > std::get<double>(*right); break;
-        case GreaterEqual: *left = std::get<double>(*left) >= std::get<double>(*right); break;
-        case Less: *left = std::get<double>(*left) < std::get<double>(*right); break;
-        case LessEqual: *left = std::get<double>(*left) <= std::get<double>(*right); break;
+        case Greater: return std::get<double>(left) > std::get<double>(right);
+        case GreaterEqual: return std::get<double>(left) >= std::get<double>(right);
+        case Less: return std::get<double>(left) < std::get<double>(right);
+        case LessEqual: return std::get<double>(left) <= std::get<double>(right);
 
-        case BangEqual: *left = *left != *right; break;
-        case EqualEqual: *left = *left == *right; break;
+        case BangEqual: return left != right;
+        case EqualEqual: return left == right;
 
         default: // ???
         }
@@ -88,7 +87,7 @@ public:
 private:
     template <class... Args> static auto make_object(Args &&... args) -> Object
     {
-        return std::make_unique<ObjectData>(std::forward<Args>(args)...);
+        return Object{std::forward<Args>(args)...};
     }
 
     auto is_truthy(const Object & obj) -> bool
@@ -99,17 +98,7 @@ private:
                 [](const auto &) { return true; },
         };
 
-        return std::visit(visitor, *obj);
-    }
-
-    auto is_equal(const Object & left, const Object & right) -> bool
-    {
-        return std::visit(
-                [&](const auto & left_val) {
-                    return std::holds_alternative<std::decay_t<decltype(left_val)>>(*right)
-                            && left_val == std::get<std::decay_t<decltype(left_val)>>(*right);
-                },
-                *left);
+        return std::visit(visitor, obj);
     }
 };
 
@@ -122,6 +111,6 @@ template <> struct std::formatter<cpplox::Interpreter::Object> : std::formatter<
     auto format(const cpplox::Interpreter::Object & obj, std::format_context & ctx) const
     {
         return std::visit(
-                [&](const auto & value) { return std::format_to(ctx.out(), "{}", value); }, *obj);
+                [&](const auto & value) { return std::format_to(ctx.out(), "{}", value); }, obj);
     }
 };
