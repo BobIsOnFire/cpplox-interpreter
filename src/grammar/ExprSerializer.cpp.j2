@@ -1,4 +1,4 @@
-module cpplox:ASTSerializer;
+module cpplox:ExprSerializer;
 
 import yaml_cpp;
 
@@ -6,7 +6,7 @@ import :Expr;
 
 namespace cpplox {
 
-export class ASTSerializer
+export class ExprSerializer
 {
 public:
     auto emitter() const -> const YAML::Emitter &

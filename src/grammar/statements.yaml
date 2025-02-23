@@ -1,0 +1,9 @@
+grammar:
+
+- type: Expression
+  params:
+  - { name: expr, type: ExprPtr }
+
+- type: Print
+  params:
+  - { name: expr, type: ExprPtr }

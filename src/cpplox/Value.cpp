@@ -19,7 +19,10 @@ struct ValueTypes
     using String = std::string;
     using Number = double;
     using Boolean = bool;
-    using Null = std::nullptr_t;
+    struct Null
+    {
+        auto operator<=>(const Null &) const = default;
+    };
 };
 
 export using Value = std::

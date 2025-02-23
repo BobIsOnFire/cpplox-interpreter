@@ -20,14 +20,14 @@ auto Lox::run(std::string source) -> ExitCode
     }
 
     Parser parser(std::move(tokens));
-    auto expression = parser.parse();
+    auto statements = parser.parse();
 
     if (Diagnostics::instance()->has_errors()) {
         return ExitCode::IncorrectInput;
     }
 
     auto * interpreter = Interpreter::instance();
-    interpreter->interpret(*expression);
+    interpreter->interpret(statements);
 
     if (Diagnostics::instance()->has_runtime_errors()) {
         return ExitCode::SoftwareError;

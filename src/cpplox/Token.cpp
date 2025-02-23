@@ -9,10 +9,18 @@ namespace cpplox {
 export class Token
 {
 public:
+    using StringLiteral = std::string;
+    using NumberLiteral = double;
+    using BooleanLiteral = bool;
+    struct NullLiteral
+    {
+    };
     struct EmptyLiteral
     {
     };
-    using Literal = std::variant<std::string, double, bool, std::nullptr_t, EmptyLiteral>;
+
+    using Literal
+            = std::variant<StringLiteral, NumberLiteral, BooleanLiteral, NullLiteral, EmptyLiteral>;
 
     Token(std::string_view lexeme,
           std::size_t line,
@@ -46,6 +54,14 @@ private:
 };
 
 } // namespace cpplox
+
+template <> struct std::formatter<cpplox::Token::NullLiteral> : std::formatter<std::string_view>
+{
+    auto format(const cpplox::Token::NullLiteral & /* lit */, std::format_context & ctx) const
+    {
+        return std::formatter<std::string_view>::format("nil", ctx);
+    }
+};
 
 template <> struct std::formatter<cpplox::Token::EmptyLiteral> : std::formatter<std::string_view>
 {

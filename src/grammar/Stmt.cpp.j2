@@ -1,0 +1,41 @@
+module cpplox:Stmt;
+
+import std;
+
+import :Expr;
+
+namespace cpplox {
+
+namespace stmt {
+{%- for elem in data.grammar %}
+export struct {{ elem.type }}; 
+{%- endfor %}
+} // namespace stmt
+
+export using Stmt = std::variant<
+    stmt::{{ data.grammar|map(attribute='type')|join(',\n    stmt::') }}
+>;
+
+export using StmtPtr = std::unique_ptr<Stmt>;
+
+namespace stmt {
+{%- for elem in data.grammar %}
+export struct {{ elem.type }} {
+  {%- for param in elem.params %}
+    {%- if param.type is defined %}
+      {{ param.type }} {{ param.name }};
+    {%- else %}
+      StmtPtr {{ param.name }};
+    {%- endif %}
+  {%- endfor %}
+};
+{%- endfor %}
+} // namespace stmt
+
+template <class StmtT, class... Args>
+auto make_unique_stmt(Args &&... args) -> StmtPtr
+{
+    return std::make_unique<Stmt>(std::in_place_type<StmtT>, std::forward<Args>(args)...);
+}
+
+} // namespace cpplox

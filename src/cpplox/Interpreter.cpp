@@ -6,6 +6,7 @@ import :Diagnostics;
 import :Expr;
 import :ExprOperandConverter;
 import :RuntimeError;
+import :Stmt;
 import :Value;
 
 namespace {
@@ -29,21 +30,34 @@ public:
         return &s_instance;
     }
 
-    auto interpret(const Expr & expr) -> void
+    auto interpret(std::span<StmtPtr> statements) -> void
     {
         try {
-            auto value = std::visit(*this, expr);
-            std::println("{}", value);
+            for (const auto & stmt : statements) {
+                std::visit(*this, *stmt);
+            }
         }
         catch (const RuntimeError & err) {
             Diagnostics::instance()->runtime_error(err);
         }
     }
 
+    // statements
+
+    auto operator()(const stmt::Print & stmt) -> void
+    {
+        std::println("{}", std::visit(*this, *stmt.expr));
+    }
+
+    auto operator()(const stmt::Expression & stmt) -> void { std::visit(*this, *stmt.expr); }
+
+    // expressions
+
     auto operator()(const expr::Literal & expr) -> Value
     {
         const auto visitor = overloads{
-                [](Token::EmptyLiteral) -> Value { return nullptr; },
+                [](Token::EmptyLiteral) -> Value { return ValueTypes::Null{}; },
+                [](Token::NullLiteral) -> Value { return ValueTypes::Null{}; },
                 [](const auto & val) -> Value { return val; },
         };
 

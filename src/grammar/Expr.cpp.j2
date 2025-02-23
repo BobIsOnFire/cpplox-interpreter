@@ -16,6 +16,8 @@ export using Expr = std::variant<
     expr::{{ data.grammar|map(attribute='type')|join(',\n    expr::') }}
 >;
 
+export using ExprPtr = std::unique_ptr<Expr>;
+
 namespace expr {
 {%- for elem in data.grammar %}
 export struct {{ elem.type }} {
@@ -23,7 +25,7 @@ export struct {{ elem.type }} {
     {%- if param.type is defined %}
       {{ param.type }} {{ param.name }};
     {%- else %}
-      std::unique_ptr<Expr> {{ param.name }};
+      ExprPtr {{ param.name }};
     {%- endif %}
   {%- endfor %}
 };
@@ -31,7 +33,7 @@ export struct {{ elem.type }} {
 } // namespace expr
 
 template <class ExprT, class... Args>
-auto make_unique_expr(Args &&... args) -> std::unique_ptr<Expr>
+auto make_unique_expr(Args &&... args) -> ExprPtr
 {
     return std::make_unique<Expr>(std::in_place_type<ExprT>, std::forward<Args>(args)...);
 }

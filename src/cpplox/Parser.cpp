@@ -2,9 +2,9 @@ module cpplox:Parser;
 
 import std;
 
-import :Expr;
 import :Diagnostics;
 import :ParserError;
+import :Stmt;
 import :Token;
 
 using enum cpplox::TokenType;
@@ -19,14 +19,13 @@ public:
     {
     }
 
-    auto parse() -> std::unique_ptr<Expr>
+    auto parse() -> std::vector<StmtPtr>
     {
-        try {
-            return expression();
+        std::vector<StmtPtr> stmts;
+        while (!is_at_end()) {
+            stmts.push_back(statement());
         }
-        catch (const ParserError & error) {
-            return make_unique_expr<expr::Literal>(Token::EmptyLiteral{});
-        }
+        return stmts;
     }
 
 private:
@@ -113,9 +112,32 @@ private:
     // This is recursive-descent parser, duh!
     // NOLINTBEGIN(misc-no-recursion)
 
-    auto expression() -> std::unique_ptr<Expr> { return equality(); }
+    auto statement() -> StmtPtr
+    {
+        if (match(Print)) {
+            return print_statement();
+        }
 
-    auto equality() -> std::unique_ptr<Expr>
+        return expression_statement();
+    }
+
+    auto print_statement() -> StmtPtr
+    {
+        auto value = expression();
+        consume(Semicolon, "Expect ';' after value.");
+        return make_unique_stmt<stmt::Print>(std::move(value));
+    }
+
+    auto expression_statement() -> StmtPtr
+    {
+        auto expr = expression();
+        consume(Semicolon, "Expect ';' after expression.");
+        return make_unique_stmt<stmt::Expression>(std::move(expr));
+    }
+
+    auto expression() -> ExprPtr { return equality(); }
+
+    auto equality() -> ExprPtr
     {
         auto expr = comparison();
         while (match_any(BangEqual, EqualEqual)) {
@@ -124,7 +146,7 @@ private:
         return expr;
     }
 
-    auto comparison() -> std::unique_ptr<Expr>
+    auto comparison() -> ExprPtr
     {
         auto expr = term();
         while (match_any(Greater, GreaterEqual, Less, LessEqual)) {
@@ -133,7 +155,7 @@ private:
         return expr;
     }
 
-    auto term() -> std::unique_ptr<Expr>
+    auto term() -> ExprPtr
     {
         auto expr = factor();
         while (match_any(Minus, Plus)) {
@@ -142,7 +164,7 @@ private:
         return expr;
     }
 
-    auto factor() -> std::unique_ptr<Expr>
+    auto factor() -> ExprPtr
     {
         auto expr = unary();
         while (match_any(Slash, Star)) {
@@ -151,7 +173,7 @@ private:
         return expr;
     }
 
-    auto unary() -> std::unique_ptr<Expr>
+    auto unary() -> ExprPtr
     {
         if (match_any(Bang, Minus)) {
             return make_unique_expr<expr::Unary>(previous(), unary());
@@ -160,7 +182,7 @@ private:
         return primary();
     }
 
-    auto primary() -> std::unique_ptr<Expr>
+    auto primary() -> ExprPtr
     {
         if (match(False)) {
             return make_unique_expr<expr::Literal>(false);
@@ -171,7 +193,7 @@ private:
         }
 
         if (match(Nil)) {
-            return make_unique_expr<expr::Literal>(nullptr);
+            return make_unique_expr<expr::Literal>(Token::NullLiteral{});
         }
 
         if (match_any(Number, String)) {
