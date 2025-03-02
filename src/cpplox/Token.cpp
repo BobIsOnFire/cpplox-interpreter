@@ -4,6 +4,16 @@ import std;
 
 import :TokenType;
 
+namespace {
+
+// helper type for the in-place visitor
+template <class... Ts> struct overloads : Ts...
+{
+    using Ts::operator()...;
+};
+
+} // namespace
+
 namespace cpplox {
 
 export class Token
@@ -17,6 +27,15 @@ public:
     };
     struct EmptyLiteral
     {
+        EmptyLiteral() = default;
+        // A hack to make Literal (and Token) types implicitly non-copyable; use clone_literal below
+        // for explicit copy.
+        EmptyLiteral(const EmptyLiteral &) = delete;
+        auto operator=(const EmptyLiteral &) -> EmptyLiteral & = delete;
+        // Core Guidelines ask to define everything else as well, so default those out.
+        EmptyLiteral(EmptyLiteral &&) = default;
+        auto operator=(EmptyLiteral &&) -> EmptyLiteral & = default;
+        ~EmptyLiteral() = default;
     };
 
     using Literal
@@ -40,12 +59,35 @@ public:
 
     [[nodiscard]] auto get_literal() const -> const Literal & { return m_literal; }
 
+    [[nodiscard]] auto clone() const -> Token;
+
 private:
     std::string m_lexeme;
     std::size_t m_line;
     TokenType m_type;
     Literal m_literal;
 };
+
+auto clone_literal(const Token::Literal & literal) -> Token::Literal
+{
+    return std::visit(overloads{
+                              [](const Token::EmptyLiteral &) -> Token::Literal {
+                                  return Token::EmptyLiteral{};
+                              },
+                              [](const auto & lit) -> Token::Literal { return lit; },
+                      },
+                      literal);
+}
+
+auto Token::clone() const -> Token
+{
+    return {
+            m_lexeme,
+            m_line,
+            m_type,
+            clone_literal(m_literal),
+    };
+}
 
 } // namespace cpplox
 

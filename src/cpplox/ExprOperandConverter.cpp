@@ -39,7 +39,7 @@ public:
             return std::get<T>(value);
         }
         catch (std::bad_variant_access &) {
-            throw RuntimeError(m_token, error_message);
+            throw RuntimeError(m_token.clone(), error_message);
         }
     }
 

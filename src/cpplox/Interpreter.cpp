@@ -58,7 +58,7 @@ public:
             value = evaluate(*stmt.init.value());
         }
 
-        m_env.define(stmt.name.get_lexeme(), value);
+        m_env.define(stmt.name.get_lexeme(), std::move(value));
     }
 
     // expressions
@@ -66,8 +66,8 @@ public:
     auto operator()(const expr::Literal & expr) -> Value
     {
         const auto visitor = overloads{
-                [](Token::EmptyLiteral) -> Value { return ValueTypes::Null{}; },
-                [](Token::NullLiteral) -> Value { return ValueTypes::Null{}; },
+                [](const Token::EmptyLiteral &) -> Value { return ValueTypes::Null{}; },
+                [](const Token::NullLiteral &) -> Value { return ValueTypes::Null{}; },
                 [](const auto & val) -> Value { return val; },
         };
 
@@ -87,7 +87,7 @@ public:
         switch (expr.op.get_type()) {
         case Bang: return !is_truthy(right);
         case Minus: return -conv.as_number(right);
-        default: throw RuntimeError(expr.op, "Unsupported unary operator.");
+        default: throw RuntimeError(expr.op.clone(), "Unsupported unary operator.");
         }
     }
 
@@ -113,7 +113,7 @@ public:
                 conv.as_string(left).append(conv.as_string(right));
                 return left;
             }
-            throw RuntimeError(expr.op, "Operands must be numbers or strings.");
+            throw RuntimeError(expr.op.clone(), "Operands must be numbers or strings.");
 
         case Greater: return conv.as_number(left) > conv.as_number(right);
         case GreaterEqual: return conv.as_number(left) >= conv.as_number(right);
@@ -123,16 +123,19 @@ public:
         case BangEqual: return left != right;
         case EqualEqual: return left == right;
 
-        default: throw RuntimeError(expr.op, "Unsupported binary operator.");
+        default: throw RuntimeError(expr.op.clone(), "Unsupported binary operator.");
         }
     }
 
-    auto operator()(const expr::Variable & expr) -> Value { return m_env.get(expr.name); }
+    auto operator()(const expr::Variable & expr) -> Value
+    {
+        return clone_value(m_env.get(expr.name));
+    }
 
     auto operator()(const expr::Assign & expr) -> Value
     {
         auto value = evaluate(*expr.value);
-        m_env.assign(expr.name, value);
+        m_env.assign(expr.name, clone_value(value));
         return value;
     }
 

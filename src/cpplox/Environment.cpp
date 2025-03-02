@@ -22,7 +22,8 @@ public:
             return it->second;
         }
 
-        throw RuntimeError(name, std::format("Undefined variable '{}'.", name.get_lexeme()));
+        throw RuntimeError(name.clone(),
+                           std::format("Undefined variable '{}'.", name.get_lexeme()));
     }
 
     auto assign(const Token & name, Value value) -> void { get(name) = std::move(value); }

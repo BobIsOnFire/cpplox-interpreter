@@ -150,7 +150,7 @@ private:
         }
 
         consume(Semicolon, "Expect ';' after variable declaration.");
-        return make_unique_stmt<stmt::Var>(name, std::move(init));
+        return make_unique_stmt<stmt::Var>(name.clone(), std::move(init));
     }
 
     auto statement() -> StmtPtr
@@ -188,7 +188,7 @@ private:
 
             const auto visitor = overloads{
                     [&](expr::Variable & e) {
-                        return make_unique_expr<expr::Assign>(e.name, std::move(value));
+                        return make_unique_expr<expr::Assign>(e.name.clone(), std::move(value));
                     },
                     [&](auto &) {
                         error(equals, "Invalid assignment target.");
@@ -206,7 +206,8 @@ private:
     {
         auto expr = comparison();
         while (match_any(BangEqual, EqualEqual)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), comparison());
+            expr = make_unique_expr<expr::Binary>(
+                    std::move(expr), previous().clone(), comparison());
         }
         return expr;
     }
@@ -215,7 +216,7 @@ private:
     {
         auto expr = term();
         while (match_any(Greater, GreaterEqual, Less, LessEqual)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), term());
+            expr = make_unique_expr<expr::Binary>(std::move(expr), previous().clone(), term());
         }
         return expr;
     }
@@ -224,7 +225,7 @@ private:
     {
         auto expr = factor();
         while (match_any(Minus, Plus)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), factor());
+            expr = make_unique_expr<expr::Binary>(std::move(expr), previous().clone(), factor());
         }
         return expr;
     }
@@ -233,7 +234,7 @@ private:
     {
         auto expr = unary();
         while (match_any(Slash, Star)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), unary());
+            expr = make_unique_expr<expr::Binary>(std::move(expr), previous().clone(), unary());
         }
         return expr;
     }
@@ -241,7 +242,7 @@ private:
     auto unary() -> ExprPtr
     {
         if (match_any(Bang, Minus)) {
-            return make_unique_expr<expr::Unary>(previous(), unary());
+            return make_unique_expr<expr::Unary>(previous().clone(), unary());
         }
 
         return primary();
@@ -262,11 +263,11 @@ private:
         }
 
         if (match_any(Number, String)) {
-            return make_unique_expr<expr::Literal>(previous().get_literal());
+            return make_unique_expr<expr::Literal>(clone_literal(previous().get_literal()));
         }
 
         if (match(Identifier)) {
-            return make_unique_expr<expr::Variable>(previous());
+            return make_unique_expr<expr::Variable>(previous().clone());
         }
 
         if (match(LeftParenthesis)) {
