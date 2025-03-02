@@ -7,6 +7,7 @@ import :Environment;
 import :Expr;
 import :ExprOperandConverter;
 import :RuntimeError;
+import :ScopeExit;
 import :Stmt;
 import :Value;
 
@@ -35,7 +36,7 @@ public:
     {
         try {
             for (const auto & stmt : statements) {
-                std::visit(*this, *stmt);
+                execute(*stmt);
             }
         }
         catch (const RuntimeError & err) {
@@ -45,7 +46,14 @@ public:
 
     auto evaluate(const Expr & expr) -> Value { return std::visit(*this, expr); }
 
+    auto execute(const Stmt & stmt) -> void { std::visit(*this, stmt); }
+
     // statements
+
+    auto operator()(const stmt::Block & block) -> void
+    {
+        execute_block(block.stmts, std::make_unique<Environment>(&*m_env));
+    }
 
     auto operator()(const stmt::Print & stmt) -> void { std::println("{}", evaluate(*stmt.expr)); }
 
@@ -58,7 +66,7 @@ public:
             value = evaluate(*stmt.init.value());
         }
 
-        m_env.define(stmt.name.get_lexeme(), std::move(value));
+        m_env->define(stmt.name.get_lexeme(), std::move(value));
     }
 
     // expressions
@@ -129,17 +137,27 @@ public:
 
     auto operator()(const expr::Variable & expr) -> Value
     {
-        return clone_value(m_env.get(expr.name));
+        return clone_value(m_env->get(expr.name));
     }
 
     auto operator()(const expr::Assign & expr) -> Value
     {
         auto value = evaluate(*expr.value);
-        m_env.assign(expr.name, clone_value(value));
+        m_env->assign(expr.name, clone_value(value));
         return value;
     }
 
 private:
+    auto execute_block(const std::vector<StmtPtr> & stmts, std::unique_ptr<Environment> env) -> void
+    {
+        std::swap(m_env, env);
+        ScopeExit exit{[&]() { std::swap(m_env, env); }};
+
+        for (const auto & stmt : stmts) {
+            execute(*stmt);
+        }
+    }
+
     auto is_truthy(const Value & val) -> bool
     {
         const auto visitor = overloads{
@@ -151,7 +169,7 @@ private:
         return std::visit(visitor, val);
     }
 
-    Environment m_env;
+    std::unique_ptr<Environment> m_env = std::make_unique<Environment>();
 };
 
 } // namespace cpplox

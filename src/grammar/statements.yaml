@@ -1,5 +1,9 @@
 grammar:
 
+- type: Block
+  params:
+  - { name: stmts, type: std::vector<cpplox::StmtPtr> }
+
 - type: Expression
   params:
   - { name: expr, type: cpplox::ExprPtr }

@@ -54,6 +54,7 @@ target_sources(cpplox
       cpplox/PrettyPrinter.cpp
       cpplox/RuntimeError.cpp
       cpplox/Scanner.cpp
+      cpplox/ScopeExit.cpp
       cpplox/Token.cpp
       cpplox/TokenType.cpp
       cpplox/Value.cpp

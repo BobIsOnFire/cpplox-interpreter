@@ -158,6 +158,9 @@ private:
         if (match(Print)) {
             return print_statement();
         }
+        if (match(LeftBrace)) {
+            return block();
+        }
 
         return expression_statement();
     }
@@ -174,6 +177,23 @@ private:
         auto expr = expression();
         consume(Semicolon, "Expect ';' after expression.");
         return make_unique_stmt<stmt::Expression>(std::move(expr));
+    }
+
+    auto block() -> StmtPtr { return make_unique_stmt<stmt::Block>(get_block_statements()); }
+
+    auto get_block_statements() -> std::vector<StmtPtr>
+    {
+        std::vector<StmtPtr> stmts;
+
+        while (!check(RightBrace) && !is_at_end()) {
+            auto decl = declaration();
+            if (decl.has_value()) {
+                stmts.push_back(std::move(decl).value());
+            }
+        }
+
+        consume(RightBrace, "Expect '}' after block.");
+        return stmts;
     }
 
     auto expression() -> ExprPtr { return assignment(); }
