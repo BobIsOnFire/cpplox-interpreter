@@ -283,7 +283,7 @@ private:
         }
 
         if (match_any(Number, String)) {
-            return make_unique_expr<expr::Literal>(clone_literal(previous().get_literal()));
+            return make_unique_expr<expr::Literal>(previous().get_literal().clone());
         }
 
         if (match(Identifier)) {

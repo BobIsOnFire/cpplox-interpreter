@@ -24,22 +24,34 @@ public:
     using BooleanLiteral = bool;
     struct NullLiteral
     {
+        auto operator<=>(const NullLiteral &) const = default;
     };
     struct EmptyLiteral
     {
-        EmptyLiteral() = default;
-        // A hack to make Literal (and Token) types implicitly non-copyable; use clone_literal below
-        // for explicit copy.
-        EmptyLiteral(const EmptyLiteral &) = delete;
-        auto operator=(const EmptyLiteral &) -> EmptyLiteral & = delete;
-        // Core Guidelines ask to define everything else as well, so default those out.
-        EmptyLiteral(EmptyLiteral &&) = default;
-        auto operator=(EmptyLiteral &&) -> EmptyLiteral & = default;
-        ~EmptyLiteral() = default;
+        auto operator<=>(const EmptyLiteral &) const = default;
     };
 
-    using Literal
+    using LiteralVariant
             = std::variant<StringLiteral, NumberLiteral, BooleanLiteral, NullLiteral, EmptyLiteral>;
+
+    class Literal : public LiteralVariant
+    {
+    public:
+        using variant::variant;
+
+        // Make implicit copy private, add explicit "clone" (yeah feels like Rust, I know)
+        [[nodiscard]] auto clone() const -> Literal { return *this; }
+
+    private:
+        Literal(const Literal &) = default;
+        auto operator=(const Literal &) -> Literal & = default;
+
+    public:
+        // Core Guidelines ask to define everything else as well, so default those out.
+        Literal(Literal &&) = default;
+        auto operator=(Literal &&) -> Literal & = default;
+        ~Literal() = default;
+    };
 
     Token(std::string lexeme, std::size_t line, TokenType type, Literal literal = EmptyLiteral{})
         : m_lexeme(std::move(lexeme))
@@ -59,7 +71,15 @@ public:
 
     [[nodiscard]] auto get_literal() const -> const Literal & { return m_literal; }
 
-    [[nodiscard]] auto clone() const -> Token;
+    [[nodiscard]] auto clone() const -> Token
+    {
+        return {
+                m_lexeme,
+                m_line,
+                m_type,
+                m_literal.clone(),
+        };
+    }
 
 private:
     std::string m_lexeme;
@@ -67,27 +87,6 @@ private:
     TokenType m_type;
     Literal m_literal;
 };
-
-auto clone_literal(const Token::Literal & literal) -> Token::Literal
-{
-    return std::visit(overloads{
-                              [](const Token::EmptyLiteral &) -> Token::Literal {
-                                  return Token::EmptyLiteral{};
-                              },
-                              [](const auto & lit) -> Token::Literal { return lit; },
-                      },
-                      literal);
-}
-
-auto Token::clone() const -> Token
-{
-    return {
-            m_lexeme,
-            m_line,
-            m_type,
-            clone_literal(m_literal),
-    };
-}
 
 } // namespace cpplox
 

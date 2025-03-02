@@ -135,15 +135,12 @@ public:
         }
     }
 
-    auto operator()(const expr::Variable & expr) -> Value
-    {
-        return clone_value(m_env->get(expr.name));
-    }
+    auto operator()(const expr::Variable & expr) -> Value { return m_env->get(expr.name).clone(); }
 
     auto operator()(const expr::Assign & expr) -> Value
     {
         auto value = evaluate(*expr.value);
-        m_env->assign(expr.name, clone_value(value));
+        m_env->assign(expr.name, value.clone());
         return value;
     }
 
