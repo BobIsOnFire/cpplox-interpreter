@@ -126,24 +126,23 @@ public:
         case Greater: return conv.as_number(left) > conv.as_number(right);
         case GreaterEqual: return conv.as_number(left) >= conv.as_number(right);
         case Less: return conv.as_number(left) < conv.as_number(right);
-        case LessEqual: return conv.as_number(left) <= conv.as_number(right);
+        case LessEqual:
+            return conv.as_number(left) <= conv.as_number(right);
 
-        case BangEqual: return left != right;
-        case EqualEqual: return left == right;
+            // TODO !!!
+            // case BangEqual: return left != right;
+            // case EqualEqual: return left == right;
 
         default: throw RuntimeError(expr.op.clone(), "Unsupported binary operator.");
         }
     }
 
-    auto operator()(const expr::Variable & expr) -> Value
-    {
-        return clone_value(m_env->get(expr.name));
-    }
+    auto operator()(const expr::Variable & expr) -> Value { return m_env->get(expr.name).clone(); }
 
     auto operator()(const expr::Assign & expr) -> Value
     {
         auto value = evaluate(*expr.value);
-        m_env->assign(expr.name, clone_value(value));
+        m_env->assign(expr.name, value.clone());
         return value;
     }
 

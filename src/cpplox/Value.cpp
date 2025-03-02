@@ -21,31 +21,30 @@ struct ValueTypes
     using Boolean = bool;
     struct Null
     {
-        auto operator<=>(const Null &) const = default;
-
-        Null() = default;
-        // A hack to make Value type implicitly non-copyable; use clone_value below for explicit
-        // copy.
-        Null(const Null &) = delete;
-        auto operator=(const Null &) -> Null & = delete;
-        // Core Guidelines ask to define everything else as well, so default those out.
-        Null(Null &&) = default;
-        auto operator=(Null &&) -> Null & = default;
-        ~Null() = default;
     };
 };
 
-export using Value = std::
+using ValueVariant = std::
         variant<ValueTypes::String, ValueTypes::Number, ValueTypes::Boolean, ValueTypes::Null>;
 
-auto clone_value(const Value & val) -> Value
+struct Value : ValueVariant
 {
-    return std::visit(overloads{
-                              [](const ValueTypes::Null &) -> Value { return ValueTypes::Null{}; },
-                              [](const auto & value) -> Value { return value; },
-                      },
-                      val);
-}
+    using variant::variant;
+
+    // Remove implicit copy, add explicit "clone" (yeah feels like Rust, I know)
+    Value(const Value &) = delete;
+    auto operator=(const Value &) -> Value & = delete;
+
+    [[nodiscard]] auto clone() const -> Value
+    {
+        return std::visit([](const auto & val) -> Value { return val; }, *this);
+    }
+
+    // Core Guidelines ask to define everything else as well, so default those out.
+    Value(Value &&) = default;
+    auto operator=(Value &&) -> Value & = default;
+    ~Value() = default;
+};
 
 } // namespace cpplox
 
