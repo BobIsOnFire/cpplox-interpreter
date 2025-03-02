@@ -1,5 +1,5 @@
 {
-    "clangd.path": "/home/nikitoss/llvm-dist/bin/clangd",
+    "clangd.path": "${userHome}/llvm-trunk/bin/clangd",
     "clangd.arguments": [
         // "--experimental-modules-support",
         "--header-insertion=never",

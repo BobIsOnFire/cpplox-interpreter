@@ -1,0 +1,25 @@
+[settings]
+os = {{ detect_api.detect_os() }}
+arch = {{ detect_api.detect_arch() }}
+build_type = Debug
+
+### For building third-parties, use system clang with libc++.
+{% set compiler, version, compiler_exe = detect_api.detect_clang_compiler() %}
+compiler = {{ compiler }}
+compiler.version = {{ version.major }}
+compiler.libcxx = libc++
+
+### C++ standard selection.
+# Try to use same cppstd for project and for deps, as there might be ABI breaks between standards
+compiler.cppstd = 23
+# NOTE: jinja2cpp doesn't compile with c++20 or c++23, downgrade cppstd for it
+jinja2cpp/*:compiler.cppstd = 17
+
+[conf]
+tools.build:compiler_executables = {'c': '{{ compiler_exe }}', 'cpp': '{{ compiler_exe }}++'}
+
+# Project itself is bootstrapped to be built with bleeding-edge LLVM.
+{% set llvm_trunk = os.path.join(os.getenv("HOME"), "llvm-trunk") %}
+&:tools.build:compiler_executables = {'c': '{{ llvm_trunk }}/bin/clang', 'cpp': '{{ llvm_trunk }}/bin/clang++'}
+&:tools.cmake.cmake_layout:build_folder_vars += options.sanitize
+&:tools.cmake.cmaketoolchain:generator = Ninja Multi-Config
