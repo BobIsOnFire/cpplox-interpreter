@@ -129,6 +129,13 @@ public:
 
     auto operator()(const expr::Variable & expr) -> Value { return m_env.get(expr.name); }
 
+    auto operator()(const expr::Assign & expr) -> Value
+    {
+        auto value = evaluate(*expr.value);
+        m_env.assign(expr.name, value);
+        return value;
+    }
+
 private:
     auto is_truthy(const Value & val) -> bool
     {

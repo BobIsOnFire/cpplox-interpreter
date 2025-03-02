@@ -9,6 +9,16 @@ import :Token;
 
 using enum cpplox::TokenType;
 
+namespace {
+
+// helper type for the in-place visitor
+template <class... Ts> struct overloads : Ts...
+{
+    using Ts::operator()...;
+};
+
+} // namespace
+
 namespace cpplox {
 
 export class Parser
@@ -166,7 +176,31 @@ private:
         return make_unique_stmt<stmt::Expression>(std::move(expr));
     }
 
-    auto expression() -> ExprPtr { return equality(); }
+    auto expression() -> ExprPtr { return assignment(); }
+
+    auto assignment() -> ExprPtr
+    {
+        auto expr = equality();
+
+        if (match(Equal)) {
+            const auto & equals = previous();
+            auto value = assignment();
+
+            const auto visitor = overloads{
+                    [&](expr::Variable & e) {
+                        return make_unique_expr<expr::Assign>(e.name, std::move(value));
+                    },
+                    [&](auto &) {
+                        error(equals, "Invalid assignment target.");
+                        return std::move(expr);
+                    },
+            };
+
+            return std::visit(visitor, *expr);
+        }
+
+        return expr;
+    }
 
     auto equality() -> ExprPtr
     {

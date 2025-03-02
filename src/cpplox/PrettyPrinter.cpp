@@ -10,6 +10,11 @@ namespace cpplox {
 export class PrettyPrinter
 {
 public:
+    auto operator()(const expr::Assign & expr) -> std::string
+    {
+        return parenthesize(std::format("assign {}", expr.name), *expr.value);
+    }
+
     auto operator()(const expr::Binary & expr) -> std::string
     {
         return parenthesize(expr.op.get_lexeme(), *expr.left, *expr.right);

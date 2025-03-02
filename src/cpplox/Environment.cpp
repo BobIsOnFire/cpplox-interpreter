@@ -25,6 +25,8 @@ public:
         throw RuntimeError(name, std::format("Undefined variable '{}'.", name.get_lexeme()));
     }
 
+    auto assign(const Token & name, Value value) -> void { get(name) = std::move(value); }
+
 private:
     std::unordered_map<std::string, Value> m_values;
 };

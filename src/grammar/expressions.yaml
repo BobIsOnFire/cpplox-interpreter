@@ -1,5 +1,10 @@
 grammar:
 
+- type: Assign
+  params:
+  - { name: name, type: cpplox::Token }
+  - { name: value }
+
 - type: Binary
   params:
   - { name: left }
