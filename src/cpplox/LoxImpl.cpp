@@ -13,6 +13,8 @@ namespace cpplox {
 
 auto Lox::run(std::string source) -> ExitCode
 {
+    Diagnostics::instance()->clear_errors();
+
     Scanner scanner(std::move(source));
     const auto & tokens = scanner.scan_tokens();
     if (Diagnostics::instance()->has_errors()) {

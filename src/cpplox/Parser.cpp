@@ -4,6 +4,7 @@ import std;
 
 import :Diagnostics;
 import :ParserError;
+import :ScopeExit;
 import :Stmt;
 import :Token;
 
@@ -156,6 +157,9 @@ private:
 
     auto statement() -> StmtPtr
     {
+        if (match(Break)) {
+            return break_statement();
+        }
         if (match(For)) {
             return for_statement();
         }
@@ -173,6 +177,16 @@ private:
         }
 
         return expression_statement();
+    }
+
+    auto break_statement() -> StmtPtr
+    {
+        const auto & break_token = previous();
+        if (!m_parsing_loop_body) {
+            throw error(break_token, "Unexpected 'break' outside of loop body.");
+        }
+        consume(Semicolon, "Expect ';' after 'break'.");
+        return make_unique_stmt<stmt::Break>(break_token.clone());
     }
 
     auto for_statement() -> StmtPtr
@@ -207,7 +221,7 @@ private:
           }
         */
 
-        auto body = statement();
+        auto body = loop_body();
         if (increment.has_value()) {
             body = make_block(std::move(body),
                               make_unique_stmt<stmt::Expression>(std::move(increment).value()));
@@ -244,7 +258,7 @@ private:
         consume(LeftParenthesis, "Expect '(' after 'while'.");
         auto condition = expression();
         consume(RightParenthesis, "Expect ')' after 'while' condition.");
-        return make_unique_stmt<stmt::While>(std::move(condition), statement());
+        return make_unique_stmt<stmt::While>(std::move(condition), loop_body());
     }
 
     auto expression_statement() -> StmtPtr
@@ -255,6 +269,14 @@ private:
     }
 
     auto block() -> StmtPtr { return make_unique_stmt<stmt::Block>(get_block_statements()); }
+
+    auto loop_body() -> StmtPtr
+    {
+        bool prev_loop_body = m_parsing_loop_body;
+        m_parsing_loop_body = true;
+        ScopeExit exit{[&]() { m_parsing_loop_body = prev_loop_body; }};
+        return statement();
+    }
 
     auto get_block_statements() -> std::vector<StmtPtr>
     {
@@ -396,6 +418,7 @@ private:
 
     std::span<const Token> m_tokens;
     std::size_t m_current = 0;
+    bool m_parsing_loop_body = false;
 };
 
 } // namespace cpplox

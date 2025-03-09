@@ -4,6 +4,10 @@ grammar:
   params:
   - { name: stmts, type: std::vector<cpplox::StmtPtr> }
 
+- type: Break
+  params:
+  - { name: self, type: cpplox::Token }
+
 - type: Expression
   params:
   - { name: expr, type: cpplox::ExprPtr }

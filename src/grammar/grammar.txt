@@ -6,12 +6,14 @@ declaration    → varDecl
 varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
 
 statement      → exprStmt
+               | breakStmt
                | forStmt
                | ifStmt
                | printStmt
                | whileStmt
                | block ;
 
+breakStmt      → "break" ";" ;
 exprStmt       → expression ";" ;
 forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
                  expression? ";"

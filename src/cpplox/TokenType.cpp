@@ -38,6 +38,7 @@ export enum class TokenType : std::uint8_t {
 
     // Keywords
     And,
+    Break,
     Class,
     Else,
     False,

@@ -26,6 +26,12 @@ public:
         return &s_instance;
     }
 
+    auto clear_errors() -> void
+    {
+        m_has_errors = false;
+        m_has_runtime_errors = false;
+    }
+
     [[nodiscard]] auto has_errors() const -> bool { return m_has_errors; }
     [[nodiscard]] auto has_runtime_errors() const -> bool { return m_has_runtime_errors; }
 

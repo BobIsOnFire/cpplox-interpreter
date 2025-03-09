@@ -181,6 +181,7 @@ private:
         using enum TokenType;
         static std::unordered_map<std::string_view, TokenType> keywords = {
                 {"and", And},
+                {"break", Break},
                 {"class", Class},
                 {"else", Else},
                 {"false", False},
