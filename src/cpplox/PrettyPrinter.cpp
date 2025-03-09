@@ -30,6 +30,11 @@ public:
         return std::format("{}", expr.value);
     }
 
+    auto operator()(const expr::Logical & expr) -> std::string
+    {
+        return parenthesize(expr.op.get_lexeme(), *expr.left, *expr.right);
+    }
+
     auto operator()(const expr::Unary & expr) -> std::string
     {
         return parenthesize(expr.op.get_lexeme(), *expr.right);
@@ -41,11 +46,9 @@ public:
     }
 
 private:
-    template <class... Exprs>
-    auto parenthesize(std::string_view name, const Exprs &... exprs) -> std::string
+    auto parenthesize(std::string_view name, const std::same_as<Expr> auto &... exprs)
+            -> std::string
     {
-        static_assert((std::is_same_v<Expr, Exprs> || ...));
-
         std::stringstream exprs_joined;
         ((exprs_joined << ' ' << std::visit(PrettyPrinter{}, exprs)), ...);
 

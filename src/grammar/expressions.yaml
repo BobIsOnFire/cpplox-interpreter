@@ -19,6 +19,12 @@ grammar:
   params:
   - { name: value, type: cpplox::Token::Literal }
 
+- type: Logical
+  params:
+  - { name: left }
+  - { name: op, type: cpplox::Token }
+  - { name: right }
+
 - type: Unary
   params:
   - { name: op, type: cpplox::Token }

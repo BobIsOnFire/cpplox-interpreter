@@ -77,11 +77,7 @@ private:
         return false;
     }
 
-    auto match_any(auto... types) -> bool
-    {
-        static_assert((std::is_same_v<TokenType, decltype(types)> || ...));
-        return (match(types) || ...);
-    }
+    auto match_any(std::same_as<TokenType> auto... types) -> bool { return (match(types) || ...); }
 
     auto consume(TokenType type, std::string_view error_message) -> const Token &
     {
@@ -144,17 +140,16 @@ private:
     {
         const auto & name = consume(Identifier, "Expect variable name.");
 
-        std::optional<ExprPtr> init = std::nullopt;
-        if (match(Equal)) {
-            init = expression();
-        }
-
+        auto init = match(Equal) ? std::optional(expression()) : std::nullopt;
         consume(Semicolon, "Expect ';' after variable declaration.");
         return make_unique_stmt<stmt::Var>(name.clone(), std::move(init));
     }
 
     auto statement() -> StmtPtr
     {
+        if (match(If)) {
+            return if_statement();
+        }
         if (match(Print)) {
             return print_statement();
         }
@@ -163,6 +158,17 @@ private:
         }
 
         return expression_statement();
+    }
+
+    auto if_statement() -> StmtPtr
+    {
+        consume(LeftParenthesis, "Expect '(' after 'if'.");
+        auto condition = expression();
+        consume(RightParenthesis, "Expect ')' after 'if' condition.");
+
+        return make_unique_stmt<stmt::If>(std::move(condition),
+                                          statement(),
+                                          match(Else) ? std::optional(statement()) : std::nullopt);
     }
 
     auto print_statement() -> StmtPtr
@@ -200,7 +206,7 @@ private:
 
     auto assignment() -> ExprPtr
     {
-        auto expr = equality();
+        auto expr = expr_or();
 
         if (match(Equal)) {
             const auto & equals = previous();
@@ -219,6 +225,24 @@ private:
             return std::visit(visitor, *expr);
         }
 
+        return expr;
+    }
+
+    auto expr_or() -> ExprPtr
+    {
+        auto expr = expr_and();
+        while (match(Or)) {
+            expr = make_unique_expr<expr::Logical>(std::move(expr), previous().clone(), expr_and());
+        }
+        return expr;
+    }
+
+    auto expr_and() -> ExprPtr
+    {
+        auto expr = equality();
+        while (match(And)) {
+            expr = make_unique_expr<expr::Logical>(std::move(expr), previous().clone(), equality());
+        }
         return expr;
     }
 

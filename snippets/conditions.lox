@@ -1,0 +1,7 @@
+var a = 10;
+if (a > 30) print "Big!";
+else if (a > 5) print "Still big!";
+else print "Small!";
+
+print "hi" or 2; // "hi".
+print nil or "yes"; // "yes".

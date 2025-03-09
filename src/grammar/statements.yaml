@@ -8,6 +8,12 @@ grammar:
   params:
   - { name: expr, type: cpplox::ExprPtr }
 
+- type: If
+  params:
+  - { name: condition, type: cpplox::ExprPtr }
+  - { name: then_branch }
+  - { name: else_branch, type: std::optional<cpplox::StmtPtr> }
+
 - type: Print
   params:
   - { name: expr, type: cpplox::ExprPtr }

@@ -55,6 +55,16 @@ public:
         execute_block(block.stmts, std::make_unique<Environment>(&*m_env));
     }
 
+    auto operator()(const stmt::If & stmt) -> void
+    {
+        if (is_truthy(evaluate(*stmt.condition))) {
+            execute(*stmt.then_branch);
+        }
+        else if (stmt.else_branch.has_value()) {
+            execute(*stmt.else_branch.value());
+        }
+    }
+
     auto operator()(const stmt::Print & stmt) -> void { std::println("{}", evaluate(*stmt.expr)); }
 
     auto operator()(const stmt::Expression & stmt) -> void { evaluate(*stmt.expr); }
@@ -80,6 +90,24 @@ public:
         };
 
         return std::visit(visitor, expr.value);
+    }
+
+    auto operator()(const expr::Logical & expr) -> Value
+    {
+        auto left = evaluate(*expr.left);
+        // logical operators short-circuit; do not evaluate right operand until
+        // checking condition on the left
+        if (expr.op.get_type() == TokenType::Or) {
+            if (is_truthy(left)) {
+                return left;
+            }
+        }
+        else {
+            if (!is_truthy(left)) {
+                return left;
+            }
+        }
+        return evaluate(*expr.right);
     }
 
     auto operator()(const expr::Grouping & expr) -> Value { return evaluate(*expr.expr); }
@@ -158,8 +186,8 @@ private:
     auto is_truthy(const Value & val) -> bool
     {
         const auto visitor = overloads{
-                [](std::nullptr_t) { return false; },
-                [](bool val) { return val; },
+                [](ValueTypes::Null) { return false; },
+                [](ValueTypes::Boolean val) { return val; },
                 [](const auto &) { return true; },
         };
 
