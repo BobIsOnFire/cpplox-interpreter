@@ -39,10 +39,10 @@ public:
                 execute(*stmt);
             }
         }
-        catch (const LoopBreak & loop_break) {
+        catch (const LoopControlExc & loop_control) {
             Diagnostics::instance()->runtime_error(RuntimeError(
-                    loop_break.token().clone(),
-                    "Executed 'break' statement outside of loop body, possibly AST bug."));
+                    loop_control.token().clone(),
+                    "Executed loop control statement outside of loop body, possibly AST bug."));
         }
         catch (const RuntimeError & err) {
             Diagnostics::instance()->runtime_error(err);
@@ -60,8 +60,6 @@ public:
         execute_block(block.stmts, std::make_unique<Environment>(&*m_env));
     }
 
-    auto operator()(const stmt::Break & stmt) -> void { throw LoopBreak{stmt.self}; }
-
     auto operator()(const stmt::If & stmt) -> void
     {
         if (is_truthy(evaluate(*stmt.condition))) {
@@ -72,6 +70,8 @@ public:
         }
     }
 
+    auto operator()(const stmt::LoopControl & stmt) -> void { throw LoopControlExc{stmt.self}; }
+
     auto operator()(const stmt::Print & stmt) -> void { std::println("{}", evaluate(*stmt.expr)); }
 
     auto operator()(const stmt::While & stmt) -> void
@@ -80,8 +80,11 @@ public:
             try {
                 execute(*stmt.body);
             }
-            catch (const LoopBreak & exit) {
-                break;
+            catch (const LoopControlExc & control) {
+                if (control.token().get_type() == TokenType::Break) {
+                    break;
+                }
+                continue;
             }
         }
     }
@@ -193,20 +196,20 @@ public:
     }
 
 private:
-    class LoopBreak : std::exception
+    class LoopControlExc : std::exception
     {
     public:
-        explicit LoopBreak(const Token & token)
+        explicit LoopControlExc(const Token & token)
             : m_token(token)
         {
         }
-        ~LoopBreak() override = default;
+        ~LoopControlExc() override = default;
 
         // Class stores a reference, explicitly forbid it from copying/moving
-        LoopBreak(LoopBreak const &) = delete;
-        LoopBreak(LoopBreak &&) = delete;
-        auto operator=(LoopBreak const &) -> LoopBreak & = delete;
-        auto operator=(LoopBreak &&) -> LoopBreak & = delete;
+        LoopControlExc(LoopControlExc const &) = delete;
+        LoopControlExc(LoopControlExc &&) = delete;
+        auto operator=(LoopControlExc const &) -> LoopControlExc & = delete;
+        auto operator=(LoopControlExc &&) -> LoopControlExc & = delete;
 
         [[nodiscard]] auto token() const -> const Token & { return m_token; }
 

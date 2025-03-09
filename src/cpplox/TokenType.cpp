@@ -40,6 +40,7 @@ export enum class TokenType : std::uint8_t {
     And,
     Break,
     Class,
+    Continue,
     Else,
     False,
     Fun,

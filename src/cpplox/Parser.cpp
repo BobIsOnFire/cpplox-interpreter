@@ -157,7 +157,7 @@ private:
 
     auto statement() -> StmtPtr
     {
-        if (match(Break)) {
+        if (match_any(Break, Continue)) {
             return break_statement();
         }
         if (match(For)) {
@@ -181,12 +181,12 @@ private:
 
     auto break_statement() -> StmtPtr
     {
-        const auto & break_token = previous();
+        const auto & token = previous();
         if (!m_parsing_loop_body) {
-            throw error(break_token, "Unexpected 'break' outside of loop body.");
+            throw error(token, "Unexpected loop control token outside of loop body.");
         }
-        consume(Semicolon, "Expect ';' after 'break'.");
-        return make_unique_stmt<stmt::Break>(break_token.clone());
+        consume(Semicolon, "Expect ';' after loop control token.");
+        return make_unique_stmt<stmt::LoopControl>(token.clone());
     }
 
     auto for_statement() -> StmtPtr

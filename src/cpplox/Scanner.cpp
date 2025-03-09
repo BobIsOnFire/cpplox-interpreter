@@ -183,6 +183,7 @@ private:
                 {"and", And},
                 {"break", Break},
                 {"class", Class},
+                {"continue", Continue},
                 {"else", Else},
                 {"false", False},
                 {"for", For},

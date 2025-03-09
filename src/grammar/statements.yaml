@@ -4,7 +4,7 @@ grammar:
   params:
   - { name: stmts, type: std::vector<cpplox::StmtPtr> }
 
-- type: Break
+- type: LoopControl
   params:
   - { name: self, type: cpplox::Token }
 

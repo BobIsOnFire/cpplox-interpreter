@@ -7,6 +7,7 @@ varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
 
 statement      → exprStmt
                | breakStmt
+               | continueStmt
                | forStmt
                | ifStmt
                | printStmt
@@ -14,6 +15,7 @@ statement      → exprStmt
                | block ;
 
 breakStmt      → "break" ";" ;
+continueStmt   → "continue" ";" ;
 exprStmt       → expression ";" ;
 forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
                  expression? ";"
