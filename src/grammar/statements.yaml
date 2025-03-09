@@ -12,6 +12,13 @@ grammar:
   params:
   - { name: expr, type: cpplox::ExprPtr }
 
+- type: For
+  params:
+  - { name: initializer, type: std::optional<cpplox::StmtPtr> }
+  - { name: condition, type: std::optional<cpplox::ExprPtr> }
+  - { name: increment, type: std::optional<cpplox::ExprPtr> }
+  - { name: body }
+
 - type: If
   params:
   - { name: condition, type: cpplox::ExprPtr }

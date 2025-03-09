@@ -60,6 +60,27 @@ public:
         execute_block(block.stmts, std::make_unique<Environment>(&*m_env));
     }
 
+    auto operator()(const stmt::For & stmt) -> void
+    {
+        if (stmt.initializer.has_value()) {
+            execute(*stmt.initializer.value());
+        }
+        while (!stmt.condition.has_value() || is_truthy(evaluate(*stmt.condition.value()))) {
+            ScopeExit loop_increment = stmt.increment.has_value()
+                    ? ScopeExit{[&]() { evaluate(*stmt.increment.value()); }}
+                    : ScopeExit{[]() {}};
+            try {
+                execute(*stmt.body);
+            }
+            catch (const LoopControlExc & control) {
+                if (control.token().get_type() == TokenType::Break) {
+                    break;
+                }
+                continue;
+            }
+        }
+    }
+
     auto operator()(const stmt::If & stmt) -> void
     {
         if (is_truthy(evaluate(*stmt.condition))) {

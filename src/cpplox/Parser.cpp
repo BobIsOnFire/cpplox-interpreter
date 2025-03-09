@@ -197,42 +197,14 @@ private:
                 ? std::nullopt
                 : std::optional(match(Var) ? var_declaration() : expression_statement());
 
-        auto condition = check(Semicolon) ? make_unique_expr<expr::Literal>(true) : expression();
+        auto condition = check(Semicolon) ? std::nullopt : std::optional(expression());
         consume(Semicolon, "Expect ';' after 'for' loop condition.");
 
         auto increment = check(RightParenthesis) ? std::nullopt : std::optional(expression());
         consume(RightParenthesis, "Expect ')' after 'for' clauses.");
 
-        /*
-          Desugar 'for' loop into 'while' loop.
-
-          From:
-
-          for (<init>; <condition>; <increment>) <body>
-
-          Into:
-
-          {
-            <init>;
-            while (<condition>) {
-              { <body> }
-              <increment>
-            }
-          }
-        */
-
-        auto body = loop_body();
-        if (increment.has_value()) {
-            body = make_block(std::move(body),
-                              make_unique_stmt<stmt::Expression>(std::move(increment).value()));
-        }
-
-        auto loop = make_unique_stmt<stmt::While>(std::move(condition), std::move(body));
-        if (initializer.has_value()) {
-            loop = make_block(std::move(initializer).value(), std::move(loop));
-        }
-
-        return loop;
+        return make_unique_stmt<stmt::For>(
+                std::move(initializer), std::move(condition), std::move(increment), loop_body());
     }
 
     auto if_statement() -> StmtPtr

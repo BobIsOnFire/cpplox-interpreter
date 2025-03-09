@@ -1,10 +1,6 @@
 var count = 0;
 for (var i = 0; i < 25; i = i + 1) {
-    // FIXME: 'continue' doesn't work with for-as-syntax-sugar-over-while implementation.
-    if (i % 3 == 0) {
-        i = i + 1;
-        continue;
-    }
+    if (i % 3 == 0) continue;
     if (i >= 15) break;
 
     count = count + 1;
