@@ -67,6 +67,13 @@ public:
 
     auto operator()(const stmt::Print & stmt) -> void { std::println("{}", evaluate(*stmt.expr)); }
 
+    auto operator()(const stmt::While & stmt) -> void
+    {
+        while (is_truthy(evaluate(*stmt.condition))) {
+            execute(*stmt.body);
+        }
+    }
+
     auto operator()(const stmt::Expression & stmt) -> void { evaluate(*stmt.expr); }
 
     auto operator()(const stmt::Var & stmt) -> void

@@ -118,6 +118,15 @@ private:
         }
     }
 
+    template <typename... Args> auto make_block(Args &&... args) -> StmtPtr
+    {
+        std::array<StmtPtr, sizeof...(args)> data{std::forward<Args>(args)...};
+        return make_unique_stmt<stmt::Block>(std::vector<StmtPtr>{
+                std::make_move_iterator(data.begin()),
+                std::make_move_iterator(data.end()),
+        });
+    }
+
     // This is recursive-descent parser, duh!
     // NOLINTBEGIN(misc-no-recursion)
 
@@ -147,17 +156,69 @@ private:
 
     auto statement() -> StmtPtr
     {
+        if (match(For)) {
+            return for_statement();
+        }
         if (match(If)) {
             return if_statement();
         }
         if (match(Print)) {
             return print_statement();
         }
+        if (match(While)) {
+            return while_statement();
+        }
         if (match(LeftBrace)) {
             return block();
         }
 
         return expression_statement();
+    }
+
+    auto for_statement() -> StmtPtr
+    {
+        consume(LeftParenthesis, "Expect '(' after 'for'.");
+
+        auto initializer = match(Semicolon)
+                ? std::nullopt
+                : std::optional(match(Var) ? var_declaration() : expression_statement());
+
+        auto condition = check(Semicolon) ? make_unique_expr<expr::Literal>(true) : expression();
+        consume(Semicolon, "Expect ';' after 'for' loop condition.");
+
+        auto increment = check(RightParenthesis) ? std::nullopt : std::optional(expression());
+        consume(RightParenthesis, "Expect ')' after 'for' clauses.");
+
+        /*
+          Desugar 'for' loop into 'while' loop.
+
+          From:
+
+          for (<init>; <condition>; <increment>) <body>
+
+          Into:
+
+          {
+            <init>;
+            while (<condition>) {
+              { <body> }
+              <increment>
+            }
+          }
+        */
+
+        auto body = statement();
+        if (increment.has_value()) {
+            body = make_block(std::move(body),
+                              make_unique_stmt<stmt::Expression>(std::move(increment).value()));
+        }
+
+        auto loop = make_unique_stmt<stmt::While>(std::move(condition), std::move(body));
+        if (initializer.has_value()) {
+            loop = make_block(std::move(initializer).value(), std::move(loop));
+        }
+
+        return loop;
     }
 
     auto if_statement() -> StmtPtr
@@ -176,6 +237,14 @@ private:
         auto value = expression();
         consume(Semicolon, "Expect ';' after value.");
         return make_unique_stmt<stmt::Print>(std::move(value));
+    }
+
+    auto while_statement() -> StmtPtr
+    {
+        consume(LeftParenthesis, "Expect '(' after 'while'.");
+        auto condition = expression();
+        consume(RightParenthesis, "Expect ')' after 'while' condition.");
+        return make_unique_stmt<stmt::While>(std::move(condition), statement());
     }
 
     auto expression_statement() -> StmtPtr
