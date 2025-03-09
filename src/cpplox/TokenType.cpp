@@ -15,6 +15,7 @@ export enum class TokenType : std::uint8_t {
     Comma,            // ,
     Dot,              // .
     Minus,            // -
+    Percent,          // %
     Plus,             // +
     Semicolon,        // ;
     Slash,            // /

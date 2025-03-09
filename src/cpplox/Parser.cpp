@@ -346,7 +346,7 @@ private:
     auto factor() -> ExprPtr
     {
         auto expr = unary();
-        while (match_any(Slash, Star)) {
+        while (match_any(Percent, Slash, Star)) {
             expr = make_unique_expr<expr::Binary>(std::move(expr), previous().clone(), unary());
         }
         return expr;

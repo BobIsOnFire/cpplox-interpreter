@@ -90,6 +90,7 @@ private:
         case ',': add_token(Comma); break;
         case '.': add_token(Dot); break;
         case '-': add_token(Minus); break;
+        case '%': add_token(Percent); break;
         case '+': add_token(Plus); break;
         case ';': add_token(Semicolon); break;
         case '*': add_token(Star); break;

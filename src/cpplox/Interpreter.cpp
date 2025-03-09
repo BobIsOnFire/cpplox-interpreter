@@ -145,6 +145,7 @@ public:
 
         switch (expr.op.get_type()) {
         case Minus: return conv.as_number(left) - conv.as_number(right);
+        case Percent: return std::fmod(conv.as_number(left), conv.as_number(right));
         case Slash: return conv.as_number(left) / conv.as_number(right);
         case Star: return conv.as_number(left) * conv.as_number(right);
 
