@@ -18,7 +18,7 @@ public:
 
     auto define(std::string name, Value value) -> void
     {
-        m_values[std::move(name)] = std::move(value);
+        m_values.insert_or_assign(std::move(name), std::move(value));
     }
 
     // NOLINTNEXTLINE(misc-no-recursion)

@@ -26,6 +26,8 @@ namespace cpplox {
 export class Interpreter
 {
 public:
+    Interpreter() { init_globals(); }
+
     static auto instance() -> Interpreter *
     {
         static Interpreter s_instance;
@@ -52,7 +54,7 @@ public:
 
     auto operator()(const stmt::Block & block) -> void
     {
-        execute_block(block.stmts, std::make_unique<Environment>(&*m_env));
+        execute_block(block.stmts, std::make_unique<Environment>(&*m_env).get());
     }
 
     auto operator()(const stmt::If & stmt) -> void
@@ -180,8 +182,28 @@ public:
         return value;
     }
 
+    auto operator()(const expr::Call & expr) -> Value
+    {
+        auto callee = evaluate(*expr.callee);
+
+        auto args = expr.args // range magic to evaluate all args in order
+                | std::views::transform([&](const auto & e) { return evaluate(*e); })
+                | std::ranges::to<std::vector>();
+
+        auto visitor = overloads{
+                [&](ValueTypes::Callable & callable) {
+                    return invoke_callable(callable, args, expr.paren);
+                },
+                [&](auto &&) -> Value {
+                    throw RuntimeError(expr.paren.clone(), "Can only call functions and classes.");
+                },
+        };
+
+        return std::visit(visitor, callee);
+    }
+
 private:
-    auto execute_block(const std::vector<StmtPtr> & stmts, std::unique_ptr<Environment> env) -> void
+    auto execute_block(const std::vector<StmtPtr> & stmts, Environment * env) -> void
     {
         std::swap(m_env, env);
         ScopeExit exit{[&]() { std::swap(m_env, env); }};
@@ -202,7 +224,30 @@ private:
         return std::visit(visitor, val);
     }
 
-    std::unique_ptr<Environment> m_env = std::make_unique<Environment>();
+    auto invoke_callable(ValueTypes::Callable & callable,
+                         const std::vector<Value> & args,
+                         const Token & token) -> Value
+    {
+        if (args.size() != callable.arity) {
+            throw RuntimeError(
+                    token.clone(),
+                    std::format("Expected {} arguments but got {}.", callable.arity, args.size()));
+        }
+        return callable.func(args);
+    }
+
+    auto init_globals() -> void
+    {
+        m_globals.define(
+                "clock", make_native_callable([]() -> Value {
+                    using namespace std::chrono;
+                    return static_cast<double>(
+                            duration_cast<seconds>(system_clock::now().time_since_epoch()).count());
+                }));
+    }
+
+    Environment m_globals;
+    Environment * m_env = &m_globals;
 };
 
 } // namespace cpplox

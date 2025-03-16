@@ -1,5 +1,6 @@
 module cpplox:ExprSerializer;
 
+import std;
 import yaml_cpp;
 
 import :Expr;
@@ -28,19 +29,18 @@ public:
         {%- for param in elem.params %}
         m_emitter << YAML::Key << "{{ param.name }}";
         m_emitter << YAML::Value;
-
-        {%- if param.type is defined %}
         this->operator()(expr.{{ param.name }});
-        {%- else %}
-        std::visit(*this, *expr.{{ param.name }});
-        {%- endif %}
-
         {%- endfor %}
 
         m_emitter << YAML::EndMap;
         m_emitter << YAML::EndMap;
     }
 {%- endfor %}
+
+    auto operator()(const cpplox::ExprPtr & expr) -> void
+    {
+        std::visit(*this, *expr);
+    }
 
     auto operator()(const Token& token) -> void
     {
@@ -59,6 +59,15 @@ public:
     auto operator()(const Token::Literal& literal) -> void
     {
         m_emitter << std::format("{}", literal);
+    }
+
+    auto operator()(const std::ranges::range auto & seq) -> void
+    {
+        m_emitter << YAML::BeginSeq;
+        for (const auto & item : seq) {
+            this->operator()(item);
+        }
+        m_emitter << YAML::EndSeq;
     }
 
 private:

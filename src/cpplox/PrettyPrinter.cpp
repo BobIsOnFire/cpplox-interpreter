@@ -20,6 +20,13 @@ public:
         return parenthesize(expr.op.get_lexeme(), *expr.left, *expr.right);
     }
 
+    auto operator()(const expr::Call & expr) -> std::string
+    {
+        return std::format("call {}{}",
+                           std::visit(PrettyPrinter{}, *expr.callee),
+                           parenthesize("args", expr.args));
+    }
+
     auto operator()(const expr::Grouping & expr) -> std::string
     {
         return parenthesize("group", *expr.expr);
@@ -46,6 +53,16 @@ public:
     }
 
 private:
+    auto parenthesize(std::string_view name, const std::ranges::range auto & seq) -> std::string
+    {
+        std::stringstream exprs_joined;
+        for (const auto & item : seq) {
+            exprs_joined << ' ' << std::visit(PrettyPrinter{}, *item);
+        }
+
+        return std::format("({}{})", name, std::move(exprs_joined).str());
+    }
+
     auto parenthesize(std::string_view name, const std::same_as<Expr> auto &... exprs)
             -> std::string
     {

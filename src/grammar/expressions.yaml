@@ -11,6 +11,12 @@ grammar:
   - { name: op, type: cpplox::Token }
   - { name: right }
 
+- type: Call
+  params:
+  - { name: callee }
+  - { name: paren, type: cpplox::Token }
+  - { name: args, type: std::vector<cpplox::ExprPtr> }
+
 - type: Grouping
   params:
   - { name: expr }

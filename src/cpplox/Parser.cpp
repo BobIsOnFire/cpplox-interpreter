@@ -17,6 +17,8 @@ template <class... Ts> struct overloads : Ts...
     using Ts::operator()...;
 };
 
+constexpr const std::size_t MAX_ARGS_COUNT = 255;
+
 } // namespace
 
 namespace cpplox {
@@ -358,7 +360,42 @@ private:
             return make_unique_expr<expr::Unary>(previous().clone(), unary());
         }
 
-        return primary();
+        return call();
+    }
+
+    auto call() -> ExprPtr
+    {
+        auto expr = primary();
+        while (true) {
+            if (match(LeftParenthesis)) {
+                expr = finish_call(std::move(expr));
+            }
+            else {
+                break;
+            }
+        }
+
+        return expr;
+    }
+
+    auto finish_call(ExprPtr callee) -> ExprPtr
+    {
+        std::vector<ExprPtr> args;
+        if (!check(RightParenthesis)) {
+            args.push_back(expression());
+            while (match(Comma)) {
+                if (args.size() >= MAX_ARGS_COUNT) {
+                    error(peek(),
+                          std::format("Can't have more than {} call arguments.", MAX_ARGS_COUNT));
+                }
+                args.push_back(expression());
+            }
+        }
+
+        return make_unique_expr<expr::Call>(
+                std::move(callee),
+                consume(RightParenthesis, "Expect ')' after call arguments.").clone(),
+                std::move(args));
     }
 
     auto primary() -> ExprPtr
