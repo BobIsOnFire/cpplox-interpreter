@@ -203,7 +203,7 @@ public:
     }
 
 private:
-    auto execute_block(const std::vector<StmtPtr> & stmts, Environment * env) -> void
+    auto execute_block(std::span<const StmtPtr> stmts, Environment * env) -> void
     {
         std::swap(m_env, env);
         ScopeExit exit{[&]() { std::swap(m_env, env); }};
@@ -225,7 +225,7 @@ private:
     }
 
     auto invoke_callable(ValueTypes::Callable & callable,
-                         const std::vector<Value> & args,
+                         std::span<const Value> args,
                          const Token & token) -> Value
     {
         if (args.size() != callable.arity) {

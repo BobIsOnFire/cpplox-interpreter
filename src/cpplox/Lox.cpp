@@ -9,7 +9,7 @@ namespace cpplox {
 export class Lox
 {
 public:
-    auto execute(const std::vector<std::string_view> & args) -> ExitCode
+    auto execute(std::span<std::string_view> args) -> ExitCode
     {
         if (args.size() > 1) {
             std::println(std::cerr, "Usage: cpplox [script]");
