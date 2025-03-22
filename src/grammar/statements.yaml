@@ -8,6 +8,12 @@ grammar:
   params:
   - { name: expr, type: cpplox::ExprPtr }
 
+- type: Function
+  params:
+  - { name: name, type: cpplox::Token }
+  - { name: params, type: std::vector<cpplox::Token> }
+  - { name: stmts, type: std::vector<cpplox::StmtPtr> }
+
 - type: If
   params:
   - { name: condition, type: cpplox::ExprPtr }
@@ -17,6 +23,11 @@ grammar:
 - type: Print
   params:
   - { name: expr, type: cpplox::ExprPtr }
+
+- type: Return
+  params:
+  - { name: keyword, type: cpplox::Token }
+  - { name: value, type: std::optional<cpplox::ExprPtr> }
 
 - type: Var
   params:

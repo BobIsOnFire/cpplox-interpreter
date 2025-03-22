@@ -135,6 +135,9 @@ private:
     auto declaration() noexcept -> std::optional<StmtPtr>
     {
         try {
+            if (match(Fun)) {
+                return function("function");
+            }
             if (match(Var)) {
                 return var_declaration();
             }
@@ -145,6 +148,28 @@ private:
             synchronize();
             return std::nullopt;
         }
+    }
+
+    auto function(std::string_view kind) -> StmtPtr
+    {
+        const auto & name = consume(Identifier, std::format("Expect {} name.", kind));
+        consume(LeftParenthesis, std::format("Expect '(' after {} name.", kind));
+
+        std::vector<Token> params;
+        if (!check(RightParenthesis)) {
+            do {
+                if (params.size() >= MAX_ARGS_COUNT) {
+                    error(peek(),
+                          std::format("Can't have more than {} call arguments.", MAX_ARGS_COUNT));
+                }
+                params.emplace_back(consume(Identifier, "Expect parameter name.").clone());
+            } while (match(Comma));
+        }
+        consume(RightParenthesis, "Expect ')' after parameters.");
+
+        consume(LeftBrace, std::format("Expect '{{' before {} body.", kind));
+        return make_unique_stmt<stmt::Function>(
+                name.clone(), std::move(params), get_block_statements());
     }
 
     auto var_declaration() -> StmtPtr
@@ -166,6 +191,9 @@ private:
         }
         if (match(Print)) {
             return print_statement();
+        }
+        if (match(Return)) {
+            return return_statement();
         }
         if (match(While)) {
             return while_statement();
@@ -239,6 +267,15 @@ private:
         auto value = expression();
         consume(Semicolon, "Expect ';' after value.");
         return make_unique_stmt<stmt::Print>(std::move(value));
+    }
+
+    auto return_statement() -> StmtPtr
+    {
+        const auto & keyword = previous();
+        auto value = check(Semicolon) ? std::nullopt : std::optional(expression());
+
+        consume(Semicolon, "Expect ';' after return value.");
+        return make_unique_stmt<stmt::Return>(keyword.clone(), std::move(value));
     }
 
     auto while_statement() -> StmtPtr

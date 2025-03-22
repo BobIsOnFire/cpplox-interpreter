@@ -25,6 +25,23 @@ namespace cpplox {
 
 export class Interpreter
 {
+private:
+    class Return : std::exception
+    {
+    public:
+        explicit Return(Value value)
+            : m_value(std::move(value))
+        {
+        }
+        template <class Self> [[nodiscard]] auto value(this Self && self) -> auto &&
+        {
+            return std::forward<Self>(self).m_value;
+        }
+
+    private:
+        Value m_value;
+    };
+
 public:
     Interpreter() { init_globals(); }
 
@@ -57,6 +74,28 @@ public:
         execute_block(block.stmts, std::make_unique<Environment>(&*m_env).get());
     }
 
+    auto operator()(const stmt::Function & stmt) -> void
+    {
+        m_env->define(stmt.name.get_lexeme(),
+                      ValueTypes::Callable{
+                              .arity = stmt.params.size(),
+                              .func = [&](std::span<const Value> args) -> Value {
+                                  auto func_env = std::make_unique<Environment>(&m_globals);
+                                  for (std::size_t i = 0; i < stmt.params.size(); i++) {
+                                      func_env->define(stmt.params[i].get_lexeme(),
+                                                       args[i].clone());
+                                  }
+                                  try {
+                                      execute_block(stmt.stmts, func_env.get());
+                                  }
+                                  catch (Return & ret) {
+                                      return std::move(ret).value();
+                                  }
+                                  return ValueTypes::Null{};
+                              },
+                      });
+    }
+
     auto operator()(const stmt::If & stmt) -> void
     {
         if (is_truthy(evaluate(*stmt.condition))) {
@@ -68,6 +107,11 @@ public:
     }
 
     auto operator()(const stmt::Print & stmt) -> void { std::println("{}", evaluate(*stmt.expr)); }
+
+    auto operator()(const stmt::Return & stmt) -> void
+    {
+        throw Return(stmt.value.has_value() ? evaluate(*stmt.value.value()) : ValueTypes::Null{});
+    }
 
     auto operator()(const stmt::While & stmt) -> void
     {
