@@ -135,7 +135,7 @@ private:
     auto declaration() noexcept -> std::optional<StmtPtr>
     {
         try {
-            if (match(Fun)) {
+            if (match(Fun) && peek().get_type() == Identifier) {
                 return function("function");
             }
             if (match(Var)) {
@@ -155,17 +155,7 @@ private:
         const auto & name = consume(Identifier, std::format("Expect {} name.", kind));
         consume(LeftParenthesis, std::format("Expect '(' after {} name.", kind));
 
-        std::vector<Token> params;
-        if (!check(RightParenthesis)) {
-            do {
-                if (params.size() >= MAX_ARGS_COUNT) {
-                    error(peek(),
-                          std::format("Can't have more than {} call arguments.", MAX_ARGS_COUNT));
-                }
-                params.emplace_back(consume(Identifier, "Expect parameter name.").clone());
-            } while (match(Comma));
-        }
-        consume(RightParenthesis, "Expect ')' after parameters.");
+        auto params = get_function_parameters();
 
         consume(LeftBrace, std::format("Expect '{{' before {} body.", kind));
         return make_unique_stmt<stmt::Function>(
@@ -403,6 +393,23 @@ private:
             return make_unique_expr<expr::Unary>(previous().clone(), unary());
         }
 
+        return function_expression();
+    }
+
+    auto function_expression() -> ExprPtr
+    {
+        if (match(Fun)) {
+            const auto & keyword = previous();
+            consume(LeftParenthesis, "Expect '(' after 'fun' expression.");
+
+            auto params = get_function_parameters();
+
+            consume(LeftBrace, "Expect '{' before anonymous function body.");
+            return make_unique_expr<expr::Function>(
+                    keyword.clone(), std::move(params), get_block_statements()
+            );
+        }
+
         return call();
     }
 
@@ -440,6 +447,22 @@ private:
                 consume(RightParenthesis, "Expect ')' after call arguments.").clone(),
                 std::move(args)
         );
+    }
+
+    auto get_function_parameters() -> std::vector<Token>
+    {
+        std::vector<Token> params;
+        if (!check(RightParenthesis)) {
+            do {
+                if (params.size() >= MAX_ARGS_COUNT) {
+                    error(peek(),
+                          std::format("Can't have more than {} call arguments.", MAX_ARGS_COUNT));
+                }
+                params.emplace_back(consume(Identifier, "Expect parameter name.").clone());
+            } while (match(Comma));
+        }
+        consume(RightParenthesis, "Expect ')' after parameters.");
+        return params;
     }
 
     auto primary() -> ExprPtr

@@ -75,26 +75,7 @@ public:
 
     auto operator()(const stmt::Function & stmt) -> void
     {
-        m_env->define(
-                stmt.name.get_lexeme(),
-                ValueTypes::Callable{
-                        .arity = stmt.params.size(),
-                        .func = [this, &stmt, env = m_env](std::span<const Value> args) -> Value {
-                            auto func_env = std::make_shared<Environment>(env.get());
-
-                            for (std::size_t i = 0; i < stmt.params.size(); i++) {
-                                func_env->define(stmt.params[i].get_lexeme(), args[i].clone());
-                            }
-                            try {
-                                execute_block(stmt.stmts, func_env);
-                            }
-                            catch (Return & ret) {
-                                return std::move(ret).value();
-                            }
-                            return ValueTypes::Null{};
-                        },
-                }
-        );
+        m_env->define(stmt.name.get_lexeme(), create_callable(stmt.params, stmt.stmts));
     }
 
     auto operator()(const stmt::If & stmt) -> void
@@ -249,6 +230,11 @@ public:
         return std::visit(visitor, callee);
     }
 
+    auto operator()(const expr::Function & expr) -> Value
+    {
+        return create_callable(expr.params, expr.stmts);
+    }
+
 private:
     auto execute_block(std::span<const StmtPtr> stmts, std::shared_ptr<Environment> env) -> void
     {
@@ -269,6 +255,27 @@ private:
         };
 
         return std::visit(visitor, val);
+    }
+
+    auto create_callable(std::span<const Token> params, std::span<const StmtPtr> stmts) -> Value
+    {
+        return ValueTypes::Callable{
+                .arity = params.size(),
+                .func = [this, params, stmts, env = m_env](std::span<const Value> args) -> Value {
+                    auto func_env = std::make_shared<Environment>(env.get());
+
+                    for (std::size_t i = 0; i < params.size(); i++) {
+                        func_env->define(params[i].get_lexeme(), args[i].clone());
+                    }
+                    try {
+                        execute_block(stmts, func_env);
+                    }
+                    catch (Return & ret) {
+                        return std::move(ret).value();
+                    }
+                    return ValueTypes::Null{};
+                },
+        };
     }
 
     auto invoke_callable(

@@ -19,6 +19,12 @@ grammar:
     - { name: paren, type: cpplox::Token }
     - { name: args, type: std::vector<cpplox::ExprPtr> }
 
+  - type: Function
+    params:
+    - { name: keyword, type: cpplox::Token }
+    - { name: params, type: std::vector<cpplox::Token> }
+    - { name: stmts, type: std::vector<cpplox::StmtPtr> }
+
   - type: Grouping
     params:
     - { name: expr }

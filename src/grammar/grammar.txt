@@ -38,7 +38,8 @@ equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term           → factor ( ( "-" | "+" ) factor )* ;
 factor         → unary ( ( "/" | "*" | "%" ) unary )* ;
-unary          → ( "!" | "-" ) unary | call ;
+unary          → ( "!" | "-" ) unary | funExpr ;
+funExpr        → "fun" "(" parameters? ")" block | call ;
 call           → primary ( "(" arguments? ")" )* ;
 primary        → "true" | "false" | "nil"
                | NUMBER | STRING
