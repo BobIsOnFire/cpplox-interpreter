@@ -3,8 +3,8 @@ module cpplox:Parser;
 import std;
 
 import :Diagnostics;
+import :Grammar;
 import :ParserError;
-import :Stmt;
 import :Token;
 
 using enum cpplox::TokenType;

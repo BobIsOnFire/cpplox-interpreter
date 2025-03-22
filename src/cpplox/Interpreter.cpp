@@ -4,11 +4,10 @@ import std;
 
 import :Diagnostics;
 import :Environment;
-import :Expr;
 import :ExprOperandConverter;
+import :Grammar;
 import :RuntimeError;
 import :ScopeExit;
-import :Stmt;
 import :Value;
 
 namespace {

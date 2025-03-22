@@ -1,0 +1,84 @@
+grammar:
+
+  expressions:
+
+  - type: Assign
+    params:
+    - { name: name, type: cpplox::Token }
+    - { name: value }
+
+  - type: Binary
+    params:
+    - { name: left }
+    - { name: op, type: cpplox::Token }
+    - { name: right }
+
+  - type: Call
+    params:
+    - { name: callee }
+    - { name: paren, type: cpplox::Token }
+    - { name: args, type: std::vector<cpplox::ExprPtr> }
+
+  - type: Grouping
+    params:
+    - { name: expr }
+
+  - type: Literal
+    params:
+    - { name: value, type: cpplox::Token::Literal }
+
+  - type: Logical
+    params:
+    - { name: left }
+    - { name: op, type: cpplox::Token }
+    - { name: right }
+
+  - type: Unary
+    params:
+    - { name: op, type: cpplox::Token }
+    - { name: right }
+
+  - type: Variable
+    params:
+    - { name: name, type: cpplox::Token }
+
+  statements:
+
+  - type: Block
+    params:
+    - { name: stmts, type: std::vector<cpplox::StmtPtr> }
+
+  - type: Expression
+    params:
+    - { name: expr, type: cpplox::ExprPtr }
+
+  - type: Function
+    params:
+    - { name: name, type: cpplox::Token }
+    - { name: params, type: std::vector<cpplox::Token> }
+    - { name: stmts, type: std::vector<cpplox::StmtPtr> }
+
+  - type: If
+    params:
+    - { name: condition, type: cpplox::ExprPtr }
+    - { name: then_branch }
+    - { name: else_branch, type: std::optional<cpplox::StmtPtr> }
+
+  - type: Print
+    params:
+    - { name: expr, type: cpplox::ExprPtr }
+
+  - type: Return
+    params:
+    - { name: keyword, type: cpplox::Token }
+    - { name: value, type: std::optional<cpplox::ExprPtr> }
+
+  - type: Var
+    params:
+    - { name: name, type: cpplox::Token }
+    - { name: init, type: std::optional<cpplox::ExprPtr> }
+
+  - type: While
+    params:
+    - { name: condition, type: cpplox::ExprPtr }
+    - { name: body }

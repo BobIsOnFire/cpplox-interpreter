@@ -1,22 +1,42 @@
-module cpplox:StmtSerializer;
+module cpplox:GrammarSerializer;
 
 import std;
 import yaml_cpp;
 
-import :Expr;
-import :ExprSerializer;
-import :Stmt;
+import :Grammar;
 
 namespace cpplox {
 
-export class StmtSerializer
+export class GrammarSerializer
 {
 public:
-    explicit StmtSerializer(YAML::Emitter & emitter)
+    explicit GrammarSerializer(YAML::Emitter & emitter)
         : m_emitter(emitter)
     {}
 
-{%- for elem in data.grammar %}
+{%- for elem in data.grammar.expressions %}
+    auto operator()(const expr::{{ elem.type }} & expr) -> void
+    {
+        m_emitter << YAML::BeginMap;
+        m_emitter << YAML::Key << "type";
+        m_emitter << YAML::Value << "{{ elem.type }}";
+
+        m_emitter << YAML::Key << "params";
+        m_emitter << YAML::Value;
+        m_emitter << YAML::BeginMap;
+
+        {%- for param in elem.params %}
+        m_emitter << YAML::Key << "{{ param.name }}";
+        m_emitter << YAML::Value;
+        this->operator()(expr.{{ param.name }});
+        {%- endfor %}
+
+        m_emitter << YAML::EndMap;
+        m_emitter << YAML::EndMap;
+    }
+{%- endfor %}
+
+{%- for elem in data.grammar.statements %}
     auto operator()(const stmt::{{ elem.type }} & stmt) -> void
     {
         m_emitter << YAML::BeginMap;
@@ -38,14 +58,14 @@ public:
     }
 {%- endfor %}
 
+    auto operator()(const cpplox::ExprPtr & expr) -> void
+    {
+        std::visit(*this, *expr);
+    }
+
     auto operator()(const cpplox::StmtPtr & stmt) -> void
     {
         std::visit(*this, *stmt);
-    }
-
-    auto operator()(const cpplox::ExprPtr & expr) -> void
-    {
-        std::visit(ExprSerializer{m_emitter}, *expr);
     }
 
     auto operator()(const Token& token) -> void

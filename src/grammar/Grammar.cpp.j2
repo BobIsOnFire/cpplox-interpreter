@@ -1,0 +1,73 @@
+module cpplox:Grammar;
+
+import std;
+
+import :Token;
+
+namespace cpplox {
+
+namespace expr {
+{%- for elem in data.grammar.expressions %}
+export struct {{ elem.type }}; 
+{%- endfor %}
+} // namespace expr
+
+export using Expr = std::variant<
+    expr::{{ data.grammar.expressions|map(attribute='type')|join(',\n    expr::') }}
+>;
+
+export using ExprPtr = std::unique_ptr<Expr>;
+
+namespace stmt {
+{%- for elem in data.grammar.statements %}
+export struct {{ elem.type }}; 
+{%- endfor %}
+} // namespace stmt
+
+export using Stmt = std::variant<
+    stmt::{{ data.grammar.statements|map(attribute='type')|join(',\n    stmt::') }}
+>;
+
+export using StmtPtr = std::unique_ptr<Stmt>;
+
+namespace expr {
+{%- for elem in data.grammar.expressions %}
+export struct {{ elem.type }} {
+  {%- for param in elem.params %}
+    {%- if param.type is defined %}
+      {{ param.type }} {{ param.name }};
+    {%- else %}
+      ExprPtr {{ param.name }};
+    {%- endif %}
+  {%- endfor %}
+};
+{%- endfor %}
+} // namespace expr
+
+template <class ExprT, class... Args>
+auto make_unique_expr(Args &&... args) -> ExprPtr
+{
+    return std::make_unique<Expr>(std::in_place_type<ExprT>, std::forward<Args>(args)...);
+}
+
+namespace stmt {
+{%- for elem in data.grammar.statements %}
+export struct {{ elem.type }} {
+  {%- for param in elem.params %}
+    {%- if param.type is defined %}
+      {{ param.type }} {{ param.name }};
+    {%- else %}
+      StmtPtr {{ param.name }};
+    {%- endif %}
+  {%- endfor %}
+};
+{%- endfor %}
+} // namespace stmt
+
+template <class StmtT, class... Args>
+auto make_unique_stmt(Args &&... args) -> StmtPtr
+{
+    return std::make_unique<Stmt>(std::in_place_type<StmtT>, std::forward<Args>(args)...);
+}
+
+} // namespace cpplox

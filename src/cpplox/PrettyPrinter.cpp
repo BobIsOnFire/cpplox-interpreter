@@ -2,7 +2,7 @@ module cpplox:PrettyPrinter;
 
 import std;
 
-import :Expr;
+import :Grammar;
 import :Token;
 
 namespace cpplox {

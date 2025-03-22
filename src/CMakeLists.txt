@@ -8,29 +8,15 @@ target_sources(grammar_generator
 )
 target_link_libraries(grammar_generator PRIVATE jinja2cpp-mod yaml-cpp-mod)
 
-foreach(source_name IN ITEMS Expr.cpp ExprSerializer.cpp)
+foreach(source_name IN ITEMS Grammar.cpp GrammarSerializer.cpp)
   add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
     COMMAND grammar_generator
-      grammar/expressions.yaml
+      grammar/grammar.yaml
       grammar/${source_name}.j2
       ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
     DEPENDS
       grammar_generator
-      grammar/expressions.yaml
-      grammar/${source_name}.j2
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  )
-endforeach()
-
-foreach(source_name IN ITEMS Stmt.cpp StmtSerializer.cpp)
-  add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
-    COMMAND grammar_generator
-      grammar/statements.yaml
-      grammar/${source_name}.j2
-      ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
-    DEPENDS
-      grammar_generator
-      grammar/statements.yaml
+      grammar/grammar.yaml
       grammar/${source_name}.j2
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   )
@@ -41,10 +27,8 @@ add_library(cpplox STATIC)
 target_sources(cpplox
   PUBLIC
     FILE_SET cxx_modules TYPE CXX_MODULES FILES 
-      ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
-      ${CMAKE_CURRENT_BINARY_DIR}/ExprSerializer.cpp
-      ${CMAKE_CURRENT_BINARY_DIR}/Stmt.cpp
-      ${CMAKE_CURRENT_BINARY_DIR}/StmtSerializer.cpp
+      ${CMAKE_CURRENT_BINARY_DIR}/Grammar.cpp
+      ${CMAKE_CURRENT_BINARY_DIR}/GrammarSerializer.cpp
       cpplox/Diagnostics.cpp
       cpplox/Environment.cpp
       cpplox/ExprOperandConverter.cpp
