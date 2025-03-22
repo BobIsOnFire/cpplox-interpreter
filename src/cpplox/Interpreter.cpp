@@ -71,7 +71,7 @@ public:
 
     auto operator()(const stmt::Block & block) -> void
     {
-        execute_block(block.stmts, std::make_unique<Environment>(&*m_env).get());
+        execute_block(block.stmts, std::make_shared<Environment>(m_env.get()));
     }
 
     auto operator()(const stmt::Function & stmt) -> void
@@ -80,13 +80,14 @@ public:
                 stmt.name.get_lexeme(),
                 ValueTypes::Callable{
                         .arity = stmt.params.size(),
-                        .func = [&](std::span<const Value> args) -> Value {
-                            auto func_env = std::make_unique<Environment>(&m_globals);
+                        .func = [this, &stmt, env = m_env](std::span<const Value> args) -> Value {
+                            auto func_env = std::make_shared<Environment>(env.get());
+
                             for (std::size_t i = 0; i < stmt.params.size(); i++) {
                                 func_env->define(stmt.params[i].get_lexeme(), args[i].clone());
                             }
                             try {
-                                execute_block(stmt.stmts, func_env.get());
+                                execute_block(stmt.stmts, func_env);
                             }
                             catch (Return & ret) {
                                 return std::move(ret).value();
@@ -111,7 +112,9 @@ public:
 
     auto operator()(const stmt::Return & stmt) -> void
     {
-        throw Return(stmt.value.has_value() ? evaluate(*stmt.value.value()) : ValueTypes::Null{});
+        throw Return(stmt.value.transform(
+                                       [this](auto & v) { return evaluate(*v); }
+        ).value_or(ValueTypes::Null{}));
     }
 
     auto operator()(const stmt::While & stmt) -> void
@@ -125,12 +128,12 @@ public:
 
     auto operator()(const stmt::Var & stmt) -> void
     {
-        Value value = ValueTypes::Null{};
-        if (stmt.init.has_value()) {
-            value = evaluate(*stmt.init.value());
-        }
-
-        m_env->define(stmt.name.get_lexeme(), std::move(value));
+        m_env->define(
+                stmt.name.get_lexeme(),
+                stmt.init.transform(
+                                 [this](auto & v) { return evaluate(*v); }
+                ).value_or(ValueTypes::Null{})
+        );
     }
 
     // expressions
@@ -248,7 +251,7 @@ public:
     }
 
 private:
-    auto execute_block(std::span<const StmtPtr> stmts, Environment * env) -> void
+    auto execute_block(std::span<const StmtPtr> stmts, std::shared_ptr<Environment> env) -> void
     {
         std::swap(m_env, env);
         ScopeExit exit{[&]() { std::swap(m_env, env); }};
@@ -284,7 +287,7 @@ private:
 
     auto init_globals() -> void
     {
-        m_globals.define(
+        m_globals->define(
                 "clock", make_native_callable([]() -> Value {
                     using namespace std::chrono;
                     return static_cast<double>(
@@ -294,8 +297,8 @@ private:
         );
     }
 
-    Environment m_globals;
-    Environment * m_env = &m_globals;
+    std::shared_ptr<Environment> m_globals = std::make_shared<Environment>();
+    std::shared_ptr<Environment> m_env = m_globals;
 };
 
 } // namespace cpplox
