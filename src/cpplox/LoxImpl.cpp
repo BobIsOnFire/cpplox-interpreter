@@ -2,11 +2,11 @@ module cpplox;
 
 import std;
 
-// import :ASTSerializer;
 import :Diagnostics;
 import :Interpreter;
 import :Parser;
 import :Scanner;
+// import :StmtSerializer;
 import :exits;
 
 namespace cpplox {
@@ -25,6 +25,12 @@ auto Lox::run(std::string source) -> ExitCode
     if (Diagnostics::instance()->has_errors()) {
         return ExitCode::IncorrectInput;
     }
+
+    // for (const auto & stmt : statements) {
+    //     YAML::Emitter emitter;
+    //     std::visit(StmtSerializer{emitter}, *stmt);
+    //     std::println("---\n{}", emitter.c_str());
+    // }
 
     auto * interpreter = Interpreter::instance();
     interpreter->interpret(statements);
