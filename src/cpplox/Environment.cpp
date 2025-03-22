@@ -32,8 +32,9 @@ public:
             return m_enclosing->get(name);
         }
 
-        throw RuntimeError(name.clone(),
-                           std::format("Undefined variable '{}'.", name.get_lexeme()));
+        throw RuntimeError(
+                name.clone(), std::format("Undefined variable '{}'.", name.get_lexeme())
+        );
     }
 
     auto assign(const Token & name, Value value) -> void { get(name) = std::move(value); }

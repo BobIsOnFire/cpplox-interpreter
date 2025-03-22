@@ -35,11 +35,12 @@ struct ValueTypes
     };
 };
 
-using ValueVariant = std::variant<ValueTypes::Callable,
-                                  ValueTypes::String,
-                                  ValueTypes::Number,
-                                  ValueTypes::Boolean,
-                                  ValueTypes::Null>;
+using ValueVariant = std::variant<
+        ValueTypes::Callable,
+        ValueTypes::String,
+        ValueTypes::Number,
+        ValueTypes::Boolean,
+        ValueTypes::Null>;
 
 class Value : public ValueVariant
 {
@@ -92,7 +93,8 @@ template <> struct std::formatter<cpplox::Value> : std::formatter<std::string_vi
                 [&](const cpplox::ValueTypes::Null &) { return std::format_to(ctx.out(), "nil"); },
                 [&](const cpplox::ValueTypes::Callable & callable) {
                     return std::format_to(
-                            ctx.out(), "<callable at {}>", static_cast<const void *>(&callable));
+                            ctx.out(), "<callable at {}>", static_cast<const void *>(&callable)
+                    );
                 },
                 [&](const auto & value) { return std::format_to(ctx.out(), "{}", value); },
         };

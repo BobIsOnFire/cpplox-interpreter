@@ -169,7 +169,8 @@ private:
 
         consume(LeftBrace, std::format("Expect '{{' before {} body.", kind));
         return make_unique_stmt<stmt::Function>(
-                name.clone(), std::move(params), get_block_statements());
+                name.clone(), std::move(params), get_block_statements()
+        );
     }
 
     auto var_declaration() -> StmtPtr
@@ -239,8 +240,10 @@ private:
 
         auto body = statement();
         if (increment.has_value()) {
-            body = make_block(std::move(body),
-                              make_unique_stmt<stmt::Expression>(std::move(increment).value()));
+            body = make_block(
+                    std::move(body),
+                    make_unique_stmt<stmt::Expression>(std::move(increment).value())
+            );
         }
 
         auto loop = make_unique_stmt<stmt::While>(std::move(condition), std::move(body));
@@ -257,9 +260,11 @@ private:
         auto condition = expression();
         consume(RightParenthesis, "Expect ')' after 'if' condition.");
 
-        return make_unique_stmt<stmt::If>(std::move(condition),
-                                          statement(),
-                                          match(Else) ? std::optional(statement()) : std::nullopt);
+        return make_unique_stmt<stmt::If>(
+                std::move(condition),
+                statement(),
+                match(Else) ? std::optional(statement()) : std::nullopt
+        );
     }
 
     auto print_statement() -> StmtPtr
@@ -359,7 +364,8 @@ private:
         auto expr = comparison();
         while (match_any(BangEqual, EqualEqual)) {
             expr = make_unique_expr<expr::Binary>(
-                    std::move(expr), previous().clone(), comparison());
+                    std::move(expr), previous().clone(), comparison()
+            );
         }
         return expr;
     }
@@ -432,7 +438,8 @@ private:
         return make_unique_expr<expr::Call>(
                 std::move(callee),
                 consume(RightParenthesis, "Expect ')' after call arguments.").clone(),
-                std::move(args));
+                std::move(args)
+        );
     }
 
     auto primary() -> ExprPtr

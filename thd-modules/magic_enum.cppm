@@ -8,4 +8,4 @@ export namespace magic_enum {
 
 using magic_enum::enum_name;
 
-} // namespace fast_float
+} // namespace magic_enum

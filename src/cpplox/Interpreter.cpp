@@ -76,24 +76,25 @@ public:
 
     auto operator()(const stmt::Function & stmt) -> void
     {
-        m_env->define(stmt.name.get_lexeme(),
-                      ValueTypes::Callable{
-                              .arity = stmt.params.size(),
-                              .func = [&](std::span<const Value> args) -> Value {
-                                  auto func_env = std::make_unique<Environment>(&m_globals);
-                                  for (std::size_t i = 0; i < stmt.params.size(); i++) {
-                                      func_env->define(stmt.params[i].get_lexeme(),
-                                                       args[i].clone());
-                                  }
-                                  try {
-                                      execute_block(stmt.stmts, func_env.get());
-                                  }
-                                  catch (Return & ret) {
-                                      return std::move(ret).value();
-                                  }
-                                  return ValueTypes::Null{};
-                              },
-                      });
+        m_env->define(
+                stmt.name.get_lexeme(),
+                ValueTypes::Callable{
+                        .arity = stmt.params.size(),
+                        .func = [&](std::span<const Value> args) -> Value {
+                            auto func_env = std::make_unique<Environment>(&m_globals);
+                            for (std::size_t i = 0; i < stmt.params.size(); i++) {
+                                func_env->define(stmt.params[i].get_lexeme(), args[i].clone());
+                            }
+                            try {
+                                execute_block(stmt.stmts, func_env.get());
+                            }
+                            catch (Return & ret) {
+                                return std::move(ret).value();
+                            }
+                            return ValueTypes::Null{};
+                        },
+                }
+        );
     }
 
     auto operator()(const stmt::If & stmt) -> void
@@ -268,14 +269,15 @@ private:
         return std::visit(visitor, val);
     }
 
-    auto invoke_callable(ValueTypes::Callable & callable,
-                         std::span<const Value> args,
-                         const Token & token) -> Value
+    auto invoke_callable(
+            ValueTypes::Callable & callable, std::span<const Value> args, const Token & token
+    ) -> Value
     {
         if (args.size() != callable.arity) {
             throw RuntimeError(
                     token.clone(),
-                    std::format("Expected {} arguments but got {}.", callable.arity, args.size()));
+                    std::format("Expected {} arguments but got {}.", callable.arity, args.size())
+            );
         }
         return callable.func(args);
     }
@@ -286,8 +288,10 @@ private:
                 "clock", make_native_callable([]() -> Value {
                     using namespace std::chrono;
                     return static_cast<double>(
-                            duration_cast<seconds>(system_clock::now().time_since_epoch()).count());
-                }));
+                            duration_cast<seconds>(system_clock::now().time_since_epoch()).count()
+                    );
+                })
+        );
     }
 
     Environment m_globals;

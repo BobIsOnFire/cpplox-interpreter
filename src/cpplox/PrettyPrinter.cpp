@@ -22,9 +22,11 @@ public:
 
     auto operator()(const expr::Call & expr) -> std::string
     {
-        return std::format("call {}{}",
-                           std::visit(PrettyPrinter{}, *expr.callee),
-                           parenthesize("args", expr.args));
+        return std::format(
+                "call {}{}",
+                std::visit(PrettyPrinter{}, *expr.callee),
+                parenthesize("args", expr.args)
+        );
     }
 
     auto operator()(const expr::Grouping & expr) -> std::string

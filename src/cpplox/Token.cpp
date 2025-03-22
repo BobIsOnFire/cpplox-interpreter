@@ -113,8 +113,8 @@ template <> struct std::formatter<cpplox::Token::Literal> : std::formatter<std::
     auto format(const cpplox::Token::Literal & literal, std::format_context & ctx) const
     {
         return std::visit(
-                [&](const auto & value) { return std::format_to(ctx.out(), "{}", value); },
-                literal);
+                [&](const auto & value) { return std::format_to(ctx.out(), "{}", value); }, literal
+        );
     }
 };
 
@@ -124,10 +124,12 @@ template <> struct std::formatter<cpplox::Token>
 
     auto format(const cpplox::Token & token, std::format_context & ctx) const
     {
-        return std::format_to(ctx.out(),
-                              "Token(lexeme={}, type={}, literal={})",
-                              token.m_lexeme,
-                              token.m_type,
-                              token.m_literal);
+        return std::format_to(
+                ctx.out(),
+                "Token(lexeme={}, type={}, literal={})",
+                token.m_lexeme,
+                token.m_type,
+                token.m_literal
+        );
     }
 };
