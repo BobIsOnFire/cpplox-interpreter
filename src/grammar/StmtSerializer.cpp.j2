@@ -1,21 +1,23 @@
-module cpplox:ExprSerializer;
+module cpplox:StmtSerializer;
 
 import std;
 import yaml_cpp;
 
 import :Expr;
+import :ExprSerializer;
+import :Stmt;
 
 namespace cpplox {
 
-export class ExprSerializer
+export class StmtSerializer
 {
 public:
-    explicit ExprSerializer(YAML::Emitter & emitter)
+    explicit StmtSerializer(YAML::Emitter & emitter)
         : m_emitter(emitter)
     {}
 
 {%- for elem in data.grammar %}
-    auto operator()(const expr::{{ elem.type }} & expr) -> void
+    auto operator()(const stmt::{{ elem.type }} & stmt) -> void
     {
         m_emitter << YAML::BeginMap;
         m_emitter << YAML::Key << "type";
@@ -28,7 +30,7 @@ public:
         {%- for param in elem.params %}
         m_emitter << YAML::Key << "{{ param.name }}";
         m_emitter << YAML::Value;
-        this->operator()(expr.{{ param.name }});
+        this->operator()(stmt.{{ param.name }});
         {%- endfor %}
 
         m_emitter << YAML::EndMap;
@@ -36,9 +38,14 @@ public:
     }
 {%- endfor %}
 
+    auto operator()(const cpplox::StmtPtr & stmt) -> void
+    {
+        std::visit(*this, *stmt);
+    }
+
     auto operator()(const cpplox::ExprPtr & expr) -> void
     {
-        std::visit(*this, *expr);
+        std::visit(ExprSerializer{m_emitter}, *expr);
     }
 
     auto operator()(const Token& token) -> void
@@ -67,6 +74,16 @@ public:
             this->operator()(item);
         }
         m_emitter << YAML::EndSeq;
+    }
+
+    template<typename T>
+    auto operator()(const std::optional<T> & item) -> void
+    {
+        if (item.has_value()) {
+            this->operator()(item.value());
+        } else {
+            m_emitter << "<empty>";
+        }
     }
 
 private:

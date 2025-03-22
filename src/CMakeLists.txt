@@ -22,7 +22,7 @@ foreach(source_name IN ITEMS Expr.cpp ExprSerializer.cpp)
   )
 endforeach()
 
-foreach(source_name IN ITEMS Stmt.cpp)
+foreach(source_name IN ITEMS Stmt.cpp StmtSerializer.cpp)
   add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
     COMMAND grammar_generator
       grammar/statements.yaml
@@ -44,6 +44,7 @@ target_sources(cpplox
       ${CMAKE_CURRENT_BINARY_DIR}/Expr.cpp
       ${CMAKE_CURRENT_BINARY_DIR}/ExprSerializer.cpp
       ${CMAKE_CURRENT_BINARY_DIR}/Stmt.cpp
+      ${CMAKE_CURRENT_BINARY_DIR}/StmtSerializer.cpp
       cpplox/Diagnostics.cpp
       cpplox/Environment.cpp
       cpplox/ExprOperandConverter.cpp
@@ -51,7 +52,6 @@ target_sources(cpplox
       cpplox/Lox.cpp
       cpplox/Parser.cpp
       cpplox/ParserError.cpp
-      cpplox/PrettyPrinter.cpp
       cpplox/RuntimeError.cpp
       cpplox/Scanner.cpp
       cpplox/ScopeExit.cpp
