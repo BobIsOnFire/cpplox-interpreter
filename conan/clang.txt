@@ -19,7 +19,7 @@ jinja2cpp/*:compiler.cppstd = 17
 tools.build:compiler_executables = {'c': '{{ compiler_exe }}', 'cpp': '{{ compiler_exe }}++'}
 
 # Project itself is bootstrapped to be built with bleeding-edge LLVM.
-{% set llvm_trunk = os.path.join(os.getenv("HOME"), "llvm-trunk") %}
-&:tools.build:compiler_executables = {'c': '{{ llvm_trunk }}/bin/clang', 'cpp': '{{ llvm_trunk }}/bin/clang++'}
+{% set llvm_dir = os.path.join(os.getenv("HOME"), "llvm-20.1.1") %}
+&:tools.build:compiler_executables = {'c': '{{ llvm_dir }}/bin/clang', 'cpp': '{{ llvm_dir }}/bin/clang++'}
 &:tools.cmake.cmake_layout:build_folder_vars += options.sanitize
 &:tools.cmake.cmaketoolchain:generator = Ninja Multi-Config
