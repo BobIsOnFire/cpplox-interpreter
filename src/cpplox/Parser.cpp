@@ -120,13 +120,16 @@ private:
         }
     }
 
-    template <typename... Args> auto make_block(Args &&... args) -> StmtPtr
+    template <typename... Args> auto make_block(const Token & token, Args &&... args) -> StmtPtr
     {
         std::array<StmtPtr, sizeof...(args)> data{std::forward<Args>(args)...};
-        return make_unique_stmt<stmt::Block>(std::vector<StmtPtr>{
-                std::make_move_iterator(data.begin()),
-                std::make_move_iterator(data.end()),
-        });
+        return make_unique_stmt<stmt::Block>(
+                token.clone(),
+                std::vector<StmtPtr>{
+                        std::make_move_iterator(data.begin()),
+                        std::make_move_iterator(data.end()),
+                }
+        );
     }
 
     // This is recursive-descent parser, duh!
@@ -238,9 +241,11 @@ private:
           }
         */
 
+        const auto & body_start = peek();
         auto body = statement();
         if (increment.has_value()) {
             body = make_block(
+                    body_start,
                     std::move(body),
                     make_unique_stmt<stmt::Expression>(std::move(increment).value())
             );
@@ -248,7 +253,7 @@ private:
 
         auto loop = make_unique_stmt<stmt::While>(std::move(condition), std::move(body));
         if (initializer.has_value()) {
-            loop = make_block(std::move(initializer).value(), std::move(loop));
+            loop = make_block(body_start, std::move(initializer).value(), std::move(loop));
         }
 
         return loop;
@@ -298,7 +303,10 @@ private:
         return make_unique_stmt<stmt::Expression>(std::move(expr));
     }
 
-    auto block() -> StmtPtr { return make_unique_stmt<stmt::Block>(get_block_statements()); }
+    auto block() -> StmtPtr
+    {
+        return make_unique_stmt<stmt::Block>(previous().clone(), get_block_statements());
+    }
 
     auto get_block_statements() -> std::vector<StmtPtr>
     {

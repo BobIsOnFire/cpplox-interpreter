@@ -2,6 +2,7 @@ grammar:
 
 - type: Block
   params:
+  - { name: start, type: cpplox::Token }
   - { name: stmts, type: std::vector<cpplox::StmtPtr> }
 
 - type: Expression

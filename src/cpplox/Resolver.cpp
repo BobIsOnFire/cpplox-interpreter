@@ -36,9 +36,9 @@ public:
 
     auto operator()(const stmt::Block & block) -> void
     {
-        begin_scope();
+        begin_scope(block.start);
         resolve(block.stmts);
-        end_scope();
+        end_scope(block.start);
     }
 
     auto operator()(const stmt::Expression & stmt) -> void { resolve(*stmt.expr); }
@@ -124,7 +124,7 @@ public:
     {
         if (!m_scopes.empty()) {
             auto it = m_scopes.back().find(expr.name.get_lexeme());
-            if (it != m_scopes.back().end() && !it->second) {
+            if (it != m_scopes.back().end() && it->second == VariableState::Declared) {
                 Diagnostics::instance()->error(
                         expr.name, "Can't read local variable in its own initializer."
                 );
@@ -141,6 +141,13 @@ private:
         Function,
     };
 
+    enum class VariableState : std::uint8_t
+    {
+        Declared,
+        Defined,
+        Accessed,
+    };
+
     auto resolve(const Stmt & stmt) -> void { std::visit(*this, stmt); }
     auto resolve(const Expr & expr) -> void { std::visit(*this, expr); }
 
@@ -148,7 +155,9 @@ private:
     {
         auto scopes_enumerated = std::views::zip(std::views::iota(0UZ), m_scopes);
         for (const auto & [i, scope] : scopes_enumerated | std::views::reverse) {
-            if (scope.contains(name.get_lexeme())) {
+            auto it = scope.find(name.get_lexeme());
+            if (it != scope.end()) {
+                it->second = VariableState::Accessed;
                 Interpreter::instance()->resolve(expr, m_scopes.size() - 1 - i);
                 return;
             }
@@ -160,19 +169,30 @@ private:
         auto enclosing = m_current_function;
         m_current_function = type;
 
-        begin_scope();
+        begin_scope(function.name);
         for (const auto & param : function.params) {
             declare(param);
             define(param);
         }
         resolve(function.stmts);
-        end_scope();
+        end_scope(function.name);
 
         m_current_function = enclosing;
     }
 
-    auto begin_scope() -> void { m_scopes.emplace_back(); }
-    auto end_scope() -> void { m_scopes.pop_back(); }
+    auto begin_scope(const Token & /* token */) -> void { m_scopes.emplace_back(); }
+    auto end_scope(const Token & token) -> void
+    {
+        for (const auto & [name, state] : m_scopes.back()) {
+            if (state != VariableState::Accessed) {
+                Diagnostics::instance()->error(
+                        token,
+                        std::format("Variable '{}' was defined but never accessed in scope", name)
+                );
+            }
+        }
+        m_scopes.pop_back();
+    }
 
     auto declare(const Token & name) -> void
     {
@@ -184,7 +204,7 @@ private:
                     name, "Already a variable with this name in this scope."
             );
         }
-        m_scopes.back().emplace(name.get_lexeme(), false);
+        m_scopes.back().emplace(name.get_lexeme(), VariableState::Declared);
     }
 
     auto define(const Token & name) -> void
@@ -192,10 +212,10 @@ private:
         if (m_scopes.empty()) {
             return;
         }
-        m_scopes.back().insert_or_assign(name.get_lexeme(), true);
+        m_scopes.back().at(name.get_lexeme()) = VariableState::Defined;
     }
 
-    std::vector<std::unordered_map<std::string, bool>> m_scopes;
+    std::vector<std::unordered_map<std::string, VariableState>> m_scopes;
     FunctionType m_current_function = FunctionType::None;
 };
 
