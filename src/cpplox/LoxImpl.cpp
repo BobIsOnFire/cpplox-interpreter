@@ -5,6 +5,7 @@ import std;
 import :Diagnostics;
 import :Interpreter;
 import :Parser;
+import :Resolver;
 import :Scanner;
 // import :StmtSerializer;
 import :exits;
@@ -31,6 +32,13 @@ auto Lox::run(std::string source) -> ExitCode
     //     std::visit(StmtSerializer{emitter}, *stmt);
     //     std::println("---\n{}", emitter.c_str());
     // }
+
+    Resolver resolver;
+    resolver.resolve(statements);
+
+    if (Diagnostics::instance()->has_errors()) {
+        return ExitCode::SoftwareError;
+    }
 
     auto * interpreter = Interpreter::instance();
     interpreter->interpret(statements);

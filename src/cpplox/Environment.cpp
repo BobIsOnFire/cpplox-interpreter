@@ -37,7 +37,19 @@ public:
         );
     }
 
-    auto assign(const Token & name, Value value) -> void { get(name) = std::move(value); }
+    auto get_at(const Token & name, std::size_t distance) -> Value &
+    {
+        return get_ancestor(distance)->get(name);
+    }
+
+    auto get_ancestor(std::size_t distance) -> Environment *
+    {
+        auto * env = this;
+        for (std::size_t i = 0; i < distance; i++) {
+            env = env->m_enclosing;
+        }
+        return env;
+    }
 
 private:
     Environment * m_enclosing = nullptr;

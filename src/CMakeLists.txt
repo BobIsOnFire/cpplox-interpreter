@@ -52,6 +52,7 @@ target_sources(cpplox
       cpplox/Lox.cpp
       cpplox/Parser.cpp
       cpplox/ParserError.cpp
+      cpplox/Resolver.cpp
       cpplox/RuntimeError.cpp
       cpplox/Scanner.cpp
       cpplox/ScopeExit.cpp

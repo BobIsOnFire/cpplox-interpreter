@@ -19,6 +19,13 @@ template <class... Ts> struct overloads : Ts...
     using Ts::operator()...;
 };
 
+template <class T, typename Var>
+concept alternative_of = requires(const Var & var) {
+    []<typename... Args>
+        requires(std::same_as<T, Args> || ...)
+    (const std::variant<Args...> &) {}(var);
+};
+
 } // namespace
 
 namespace cpplox {
@@ -67,6 +74,11 @@ public:
 
     auto execute(const Stmt & stmt) -> void { std::visit(*this, stmt); }
 
+    auto resolve(const alternative_of<Expr> auto & expr, std::size_t depth) -> void
+    {
+        m_locals.insert_or_assign(static_cast<const void *>(&expr), depth);
+    }
+
     // statements
 
     auto operator()(const stmt::Block & block) -> void
@@ -112,8 +124,7 @@ public:
 
     auto operator()(const stmt::Return & stmt) -> void
     {
-        throw Return(stmt.value.transform(
-                                       [this](auto & v) { return evaluate(*v); }
+        throw Return(stmt.value.transform([this](auto & v) { return evaluate(*v); }
         ).value_or(ValueTypes::Null{}));
     }
 
@@ -130,8 +141,7 @@ public:
     {
         m_env->define(
                 stmt.name.get_lexeme(),
-                stmt.init.transform(
-                                 [this](auto & v) { return evaluate(*v); }
+                stmt.init.transform([this](auto & v) { return evaluate(*v); }
                 ).value_or(ValueTypes::Null{})
         );
     }
@@ -221,12 +231,15 @@ public:
         }
     }
 
-    auto operator()(const expr::Variable & expr) -> Value { return m_env->get(expr.name).clone(); }
+    auto operator()(const expr::Variable & expr) -> Value
+    {
+        return lookup_variable(expr.name, expr).clone();
+    }
 
     auto operator()(const expr::Assign & expr) -> Value
     {
         auto value = evaluate(*expr.value);
-        m_env->assign(expr.name, value.clone());
+        lookup_variable(expr.name, expr) = value.clone();
         return value;
     }
 
@@ -285,6 +298,15 @@ private:
         return callable.func(args);
     }
 
+    auto lookup_variable(const Token & name, const alternative_of<Expr> auto & expr) -> Value &
+    {
+        auto it = m_locals.find(static_cast<const void *>(&expr));
+        if (it != m_locals.end()) {
+            return m_env->get_at(name, it->second);
+        }
+        return m_globals->get(name);
+    }
+
     auto init_globals() -> void
     {
         m_globals->define(
@@ -297,6 +319,7 @@ private:
         );
     }
 
+    std::unordered_map<const void *, std::size_t> m_locals;
     std::shared_ptr<Environment> m_globals = std::make_shared<Environment>();
     std::shared_ptr<Environment> m_env = m_globals;
 };
