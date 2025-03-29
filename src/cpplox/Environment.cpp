@@ -51,6 +51,8 @@ public:
         return env;
     }
 
+    auto clear() -> void { m_values.clear(); }
+
 private:
     Environment * m_enclosing = nullptr;
     std::unordered_map<std::string, Value> m_values;
