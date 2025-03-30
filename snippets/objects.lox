@@ -1,0 +1,13 @@
+class Bagel {
+  eat() {
+    print "Crunch crunch crunch!";
+  }
+}
+
+var bagel = Bagel();
+bagel.taste = "good";
+bagel.filling = "cream cheese";
+
+print bagel.taste + " bagel with " + bagel.filling;
+
+bagel.eat();

@@ -2,6 +2,9 @@ module cpplox:Value;
 
 import std;
 
+import :RuntimeError;
+import :Token;
+
 namespace {
 
 // helper type for the in-place visitor
@@ -33,14 +36,28 @@ struct ValueTypes
         // Callable is never equal to one another (unless it's actually the same object)
         auto operator==(const Callable & other) const -> bool { return this == &other; }
     };
+    class Object
+    {
+    public:
+        auto get(const Token & name) -> Value &;
+        auto set(const Token & name, Value && value) -> void;
+
+        // Object is never equal to one another (unless it's actually the same object)
+        auto operator==(const Object & other) const -> bool { return this == &other; }
+
+    private:
+        std::shared_ptr<std::unordered_map<std::string, Value>> m_fields
+                = std::make_shared<std::unordered_map<std::string, Value>>();
+    };
 };
 
 using ValueVariant = std::variant<
-        ValueTypes::Callable,
         ValueTypes::String,
         ValueTypes::Number,
         ValueTypes::Boolean,
-        ValueTypes::Null>;
+        ValueTypes::Null,
+        ValueTypes::Callable,
+        ValueTypes::Object>;
 
 class Value : public ValueVariant
 {
@@ -50,7 +67,8 @@ public:
     // Make implicit copy private, add explicit "clone" (yeah feels like Rust, I know)
     [[nodiscard]] auto clone() const -> Value { return *this; }
 
-private:
+    // FIXME
+    // private:
     Value(const Value &) = default;
     auto operator=(const Value &) -> Value & = default;
 
@@ -60,6 +78,21 @@ public:
     auto operator=(Value &&) -> Value & = default;
     ~Value() = default;
 };
+
+auto ValueTypes::Object::get(const Token & name) -> Value &
+{
+    auto it = m_fields->find(name.get_lexeme());
+    if (it != m_fields->end()) {
+        return it->second;
+    }
+
+    throw RuntimeError(name.clone(), std::format("Undefined property '{}'.", name.get_lexeme()));
+}
+
+auto ValueTypes::Object::set(const Token & name, Value && value) -> void
+{
+    m_fields->insert_or_assign(name.get_lexeme(), std::move(value));
+}
 
 template <typename T, typename... Args>
 concept NativeCallable = requires(T && f, Args &&... args) {
@@ -94,6 +127,11 @@ template <> struct std::formatter<cpplox::Value> : std::formatter<std::string_vi
                 [&](const cpplox::ValueTypes::Callable & callable) {
                     return std::format_to(
                             ctx.out(), "<callable at {}>", static_cast<const void *>(&callable)
+                    );
+                },
+                [&](const cpplox::ValueTypes::Object & obj) {
+                    return std::format_to(
+                            ctx.out(), "<object at {}>", static_cast<const void *>(&obj)
                     );
                 },
                 [&](const auto & value) { return std::format_to(ctx.out(), "{}", value); },

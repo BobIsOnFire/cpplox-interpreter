@@ -41,6 +41,17 @@ public:
         end_scope();
     }
 
+    auto operator()(const stmt::Class & stmt) -> void
+    {
+        declare(stmt.name);
+        define(stmt.name);
+
+        for (const auto & method : stmt.methods) {
+            auto declaration = FunctionType::Method;
+            resolve_function(std::get<stmt::Function>(*method), declaration);
+        }
+    }
+
     auto operator()(const stmt::Expression & stmt) -> void { resolve(*stmt.expr); }
 
     auto operator()(const stmt::Function & stmt) -> void
@@ -108,6 +119,8 @@ public:
         }
     }
 
+    auto operator()(const expr::Get & expr) -> void { resolve(*expr.object); }
+
     auto operator()(const expr::Grouping & expr) -> void { resolve(*expr.expr); }
 
     auto operator()(const expr::Literal & /* expr */) -> void {}
@@ -116,6 +129,12 @@ public:
     {
         resolve(*expr.left);
         resolve(*expr.right);
+    }
+
+    auto operator()(const expr::Set & expr) -> void
+    {
+        resolve(*expr.value);
+        resolve(*expr.object);
     }
 
     auto operator()(const expr::Unary & expr) -> void { resolve(*expr.right); }
@@ -139,6 +158,7 @@ private:
     {
         None,
         Function,
+        Method,
     };
 
     auto resolve(const Stmt & stmt) -> void { std::visit(*this, stmt); }

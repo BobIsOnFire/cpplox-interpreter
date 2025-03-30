@@ -135,6 +135,9 @@ private:
     auto declaration() noexcept -> std::optional<StmtPtr>
     {
         try {
+            if (match(Class)) {
+                return class_declaration();
+            }
             if (match(Fun)) {
                 return function("function");
             }
@@ -148,6 +151,21 @@ private:
             synchronize();
             return std::nullopt;
         }
+    }
+
+    auto class_declaration() -> StmtPtr
+    {
+        const auto & name = consume(Identifier, "Expect class name.");
+        consume(LeftBrace, "Expect '{' before class body.");
+
+        std::vector<StmtPtr> methods;
+        while (!check(RightBrace) && !is_at_end()) {
+            methods.push_back(function("method"));
+        }
+
+        consume(RightBrace, "Expect '}' after class body.");
+
+        return make_unique_stmt<stmt::Class>(name.clone(), std::move(methods));
     }
 
     auto function(std::string_view kind) -> StmtPtr
@@ -329,6 +347,11 @@ private:
                     [&](expr::Variable & e) {
                         return make_unique_expr<expr::Assign>(e.name.clone(), std::move(value));
                     },
+                    [&](expr::Get & e) {
+                        return make_unique_expr<expr::Set>(
+                                std::move(e.object), std::move(e.name), std::move(value)
+                        );
+                    },
                     [&](auto &) {
                         error(equals, "Invalid assignment target.");
                         return std::move(expr);
@@ -412,6 +435,10 @@ private:
         while (true) {
             if (match(LeftParenthesis)) {
                 expr = finish_call(std::move(expr));
+            }
+            else if (match(Dot)) {
+                const auto & name = consume(Identifier, "Expect property name after '.'.");
+                expr = make_unique_expr<expr::Get>(std::move(expr), name.clone());
             }
             else {
                 break;

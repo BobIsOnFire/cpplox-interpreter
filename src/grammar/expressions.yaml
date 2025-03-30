@@ -17,6 +17,11 @@ grammar:
   - { name: paren, type: cpplox::Token }
   - { name: args, type: std::vector<cpplox::ExprPtr> }
 
+- type: Get
+  params:
+  - { name: object }
+  - { name: name, type: cpplox::Token }
+
 - type: Grouping
   params:
   - { name: expr }
@@ -30,6 +35,12 @@ grammar:
   - { name: left }
   - { name: op, type: cpplox::Token }
   - { name: right }
+
+- type: Set
+  params:
+  - { name: object }
+  - { name: name, type: cpplox::Token }
+  - { name: value }
 
 - type: Unary
   params:
