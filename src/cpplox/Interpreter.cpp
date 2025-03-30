@@ -102,14 +102,31 @@ public:
     {
         m_env->define(stmt.name.get_lexeme(), ValueTypes::Null{});
         m_env->get(stmt.name) = ValueTypes::Callable{
+                // FIXME: should dynamically check arg number in initializer call instead
                 .arity = 0,
-                .func = [&](std::span<const Value> /* args */) -> Value {
+                .func = [this, &stmt, env = m_env](std::span<const Value> args) -> Value {
+                    auto class_env = std::make_shared<Environment>(env.get());
+
+                    std::swap(m_env, class_env);
+                    ScopeExit exit{[&]() { std::swap(m_env, class_env); }};
+
                     auto obj = ValueTypes::Object{};
+                    m_env->define("this", obj);
+
+                    Token init_tok("init", stmt.name.get_line(), TokenType::Identifier, "init");
+                    obj.set(init_tok,
+                            make_native_callable([]() -> Value { return ValueTypes::Null{}; }));
 
                     for (const auto & method : stmt.methods) {
                         const auto & func = std::get<stmt::Function>(*method);
-                        obj.set(func.name, create_callable(func.params, func.stmts));
+                        bool is_initializer = func.name.get_lexeme() == "init";
+                        obj.set(func.name,
+                                create_callable(func.name, func.params, func.stmts, is_initializer)
+                        );
                     }
+
+                    // initialize object
+                    invoke_value(obj.get(init_tok), args, init_tok);
 
                     return obj;
                 },
@@ -118,7 +135,7 @@ public:
 
     auto operator()(const stmt::Function & stmt) -> void
     {
-        m_env->define(stmt.name.get_lexeme(), create_callable(stmt.params, stmt.stmts));
+        m_env->define(stmt.name.get_lexeme(), create_callable(stmt.name, stmt.params, stmt.stmts));
     }
 
     auto operator()(const stmt::If & stmt) -> void
@@ -247,6 +264,11 @@ public:
         return lookup_variable(expr.name, expr).clone();
     }
 
+    auto operator()(const expr::This & expr) -> Value
+    {
+        return lookup_variable(expr.keyword, expr).clone();
+    }
+
     auto operator()(const expr::Assign & expr) -> Value
     {
         auto value = evaluate(*expr.value);
@@ -262,16 +284,7 @@ public:
                 | std::views::transform([&](const auto & e) { return evaluate(*e); })
                 | std::ranges::to<std::vector>();
 
-        auto visitor = overloads{
-                [&](ValueTypes::Callable & callable) {
-                    return invoke_callable(callable, args, expr.paren);
-                },
-                [&](auto &&) -> Value {
-                    throw RuntimeError(expr.paren.clone(), "Can only call functions and classes.");
-                },
-        };
-
-        return std::visit(visitor, callee);
+        return invoke_value(callee, args, expr.paren);
     }
 
     auto operator()(const expr::Get & expr) -> Value
@@ -326,28 +339,57 @@ private:
         return std::visit(visitor, val);
     }
 
-    auto create_callable(std::span<const Token> params, std::span<const StmtPtr> stmts) -> Value
+    auto create_callable(
+            const Token & name,
+            std::span<const Token> params,
+            std::span<const StmtPtr> stmts,
+            bool is_initializer = false
+    ) -> Value
     {
         return ValueTypes::Callable{
                 .arity = params.size(),
                 // FIXME: In REPL mode, if function was defined in a different line input,
                 // "stmts" might already be destroyed when we actually get to calling it.
                 // Need to have statements globally available somehow to support REPL mode.
-                .func = [this, params, stmts, env = m_env](std::span<const Value> args) -> Value {
+                .func = [this, &name, params, stmts, is_initializer, env = m_env](
+                                std::span<const Value> args
+                        ) -> Value {
                     auto func_env = std::make_shared<Environment>(env.get());
 
                     for (std::size_t i = 0; i < params.size(); i++) {
                         func_env->define(params[i].get_lexeme(), args[i].clone());
                     }
+
+                    Value return_value = ValueTypes::Null{};
                     try {
                         execute_block(stmts, func_env);
                     }
                     catch (Return & ret) {
-                        return std::move(ret).value();
+                        return_value = std::move(ret).value();
                     }
-                    return ValueTypes::Null{};
+
+                    if (is_initializer) {
+                        Token this_tok("this", name.get_line(), TokenType::This, "this");
+                        return_value = func_env->get_at(this_tok, 0);
+                    }
+
+                    return return_value;
                 },
         };
+    }
+
+    auto invoke_value(Value & value, std::span<const Value> args, const Token & token) -> Value
+    {
+        auto visitor = overloads{
+                [&](ValueTypes::Callable & callable) {
+                    return invoke_callable(callable, args, token);
+                },
+                [&](auto &&) -> Value {
+                    throw RuntimeError(token.clone(), "Can only call functions and classes.");
+                },
+        };
+
+        return std::visit(visitor, value);
     }
 
     auto invoke_callable(

@@ -43,13 +43,25 @@ public:
 
     auto operator()(const stmt::Class & stmt) -> void
     {
+        auto enclosing = m_current_class;
+        m_current_class = ClassType::Class;
+
         declare(stmt.name);
         define(stmt.name);
 
+        begin_scope();
+        m_scopes.back().insert_or_assign("this", true);
+
         for (const auto & method : stmt.methods) {
-            auto declaration = FunctionType::Method;
-            resolve_function(std::get<stmt::Function>(*method), declaration);
+            const auto & m = std::get<stmt::Function>(*method);
+            auto declaration = m.name.get_lexeme() == "init" ? FunctionType::Initializer
+                                                             : FunctionType::Method;
+            resolve_function(m, declaration);
         }
+
+        end_scope();
+
+        m_current_class = enclosing;
     }
 
     auto operator()(const stmt::Expression & stmt) -> void { resolve(*stmt.expr); }
@@ -76,8 +88,14 @@ public:
     {
         if (m_current_function == FunctionType::None) {
             Diagnostics::instance()->error(stmt.keyword, "Can't return from top-level code.");
+            return;
         }
         if (stmt.value.has_value()) {
+            if (m_current_function == FunctionType::Initializer) {
+                Diagnostics::instance()->error(
+                        stmt.keyword, "Can't return value from initializer."
+                );
+            }
             resolve(*stmt.value.value());
         }
     }
@@ -137,6 +155,15 @@ public:
         resolve(*expr.object);
     }
 
+    auto operator()(const expr::This & expr) -> void
+    {
+        if (m_current_class == ClassType::None) {
+            Diagnostics::instance()->error(expr.keyword, "Can't use 'this' outside of a class.");
+            return;
+        }
+        resolve_local(expr, expr.keyword);
+    }
+
     auto operator()(const expr::Unary & expr) -> void { resolve(*expr.right); }
 
     auto operator()(const expr::Variable & expr) -> void
@@ -158,7 +185,14 @@ private:
     {
         None,
         Function,
+        Initializer,
         Method,
+    };
+
+    enum class ClassType : std::uint8_t
+    {
+        None,
+        Class,
     };
 
     auto resolve(const Stmt & stmt) -> void { std::visit(*this, stmt); }
@@ -217,6 +251,7 @@ private:
 
     std::vector<std::unordered_map<std::string, bool>> m_scopes;
     FunctionType m_current_function = FunctionType::None;
+    ClassType m_current_class = ClassType::None;
 };
 
 } // namespace cpplox

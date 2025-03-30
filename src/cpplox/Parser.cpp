@@ -487,6 +487,10 @@ private:
             return make_unique_expr<expr::Literal>(previous().get_literal().clone());
         }
 
+        if (match(This)) {
+            return make_unique_expr<expr::This>(previous().clone());
+        }
+
         if (match(Identifier)) {
             return make_unique_expr<expr::Variable>(previous().clone());
         }

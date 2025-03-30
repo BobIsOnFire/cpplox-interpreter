@@ -1,13 +1,22 @@
 class Bagel {
+  init() {
+    this.taste = "good";
+    this.filling = "cream cheese";
+  }
+
+  describe() {
+    return this.taste + " bagel with " + this.filling;
+  }
+
   eat() {
     print "Crunch crunch crunch!";
   }
 }
 
 var bagel = Bagel();
-bagel.taste = "good";
-bagel.filling = "cream cheese";
-
-print bagel.taste + " bagel with " + bagel.filling;
-
 bagel.eat();
+
+print bagel.describe();
+
+bagel.taste = "amazing";
+print bagel.describe();

@@ -42,6 +42,10 @@ grammar:
   - { name: name, type: cpplox::Token }
   - { name: value }
 
+- type: This
+  params:
+  - { name: keyword, type: cpplox::Token }
+
 - type: Unary
   params:
   - { name: op, type: cpplox::Token }
