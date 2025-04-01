@@ -8,7 +8,7 @@ import :Value;
 
 namespace cpplox {
 
-export class Environment
+class Environment
 {
 public:
     explicit Environment(Environment * enclosing = nullptr)

@@ -18,6 +18,7 @@ template <class... Ts> struct overloads : Ts...
 namespace cpplox {
 
 class Class;
+class Environment;
 class Value;
 
 struct ValueTypes
@@ -31,7 +32,14 @@ struct ValueTypes
     };
     struct Callable
     {
-        std::function<Value(const Token &, std::span<const Value>)> func;
+        [[nodiscard]] auto call(const Token & caller, std::span<const Value> args) const -> Value;
+
+        std::shared_ptr<Environment> closure;
+        std::function<
+                Value(const Token & /* caller */,
+                      Environment * /* closure */,
+                      std::span<const Value> /* args */)>
+                func;
 
         // Callable is never equal to one another (unless it's actually the same object)
         auto operator==(const Callable & other) const -> bool { return this == &other; }
@@ -43,6 +51,7 @@ struct ValueTypes
             : m_class(std::move(cls)) {};
 
         auto get(const Token & name) -> Value;
+        auto get_method(const std::string & name) -> std::optional<ValueTypes::Callable>;
         auto set(const Token & name, Value && value) -> void;
 
         // Object is never equal to one another (unless it's actually the same object)
@@ -85,6 +94,11 @@ public:
     ~Value() = default;
 };
 
+auto ValueTypes::Callable::call(const Token & caller, std::span<const Value> args) const -> Value
+{
+    return func(caller, closure.get(), args);
+}
+
 class Class
 {
 public:
@@ -117,9 +131,9 @@ auto ValueTypes::Object::get(const Token & name) -> Value
         return it->second;
     }
 
-    const auto * method = m_class->find_method(name.get_lexeme());
-    if (method != nullptr) {
-        return *method;
+    auto method = get_method(name.get_lexeme());
+    if (method.has_value()) {
+        return std::move(method).value();
     }
 
     throw RuntimeError(name.clone(), std::format("Undefined property '{}'.", name.get_lexeme()));
@@ -138,7 +152,8 @@ concept NativeCallable = requires(T && f, Args &&... args) {
 template <typename Func, std::size_t... Is>
 auto make_runtime_caller(Func && f, std::index_sequence<Is...> /* ids */)
 {
-    return [f = std::forward<Func>(f)](const Token & caller, std::span<const Value> args) {
+    return [f = std::forward<Func>(f
+            )](const Token & caller, Environment * /* closure */, std::span<const Value> args) {
         if (args.size() != sizeof...(Is)) {
             throw RuntimeError(
                     caller.clone(),
@@ -151,9 +166,11 @@ auto make_runtime_caller(Func && f, std::index_sequence<Is...> /* ids */)
 }
 
 template <std::same_as<Value>... Args, NativeCallable<Args...> Func>
-auto make_native_callable(Func && f) -> ValueTypes::Callable
+auto make_native_callable(const std::shared_ptr<Environment> & closure, Func && f)
+        -> ValueTypes::Callable
 {
     return {
+            .closure = closure,
             .func = make_runtime_caller(std::forward<Func>(f), std::index_sequence_for<Args...>{}),
     };
 }

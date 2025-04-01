@@ -115,22 +115,18 @@ public:
 
         m_env->define(stmt.name.get_lexeme(), ValueTypes::Null{});
         m_env->get(stmt.name) = ValueTypes::Callable{
+                .closure = m_env,
                 .func = [this,
-                         cls,
-                         env = m_env](const Token & caller, std::span<const Value> args) -> Value {
-                    auto obj_env = std::make_shared<Environment>(env.get());
-
-                    std::swap(m_env, obj_env);
-                    ScopeExit exit{[&]() { std::swap(m_env, obj_env); }};
-
+                         cls](const Token & caller,
+                              Environment * /* closure */,
+                              std::span<const Value> args) -> Value {
                     try {
                         auto obj = ValueTypes::Object(cls);
-                        m_env->define("this", obj);
 
                         // initialize object
-                        const auto * init = cls->find_method("init");
-                        if (init) {
-                            return init->func(caller, args);
+                        auto init = obj.get_method("init");
+                        if (init.has_value()) {
+                            return init.value().call(caller, args);
                         }
                         return obj;
                     }
@@ -356,12 +352,14 @@ private:
     ) -> ValueTypes::Callable
     {
         return {
+                .closure = m_env,
                 // FIXME: In REPL mode, if function was defined in a different line input,
                 // "stmts" might already be destroyed when we actually get to calling it.
                 // Need to have statements globally available somehow to support REPL mode.
-                .func = [this, &name, params, stmts, is_initializer, env = m_env](
-                                const Token & caller, std::span<const Value> args
-                        ) -> Value {
+                .func
+                = [this, &name, params, stmts, is_initializer](
+                          const Token & caller, Environment * closure, std::span<const Value> args
+                  ) -> Value {
                     if (args.size() != params.size()) {
                         throw RuntimeError(
                                 caller.clone(),
@@ -373,7 +371,7 @@ private:
                         );
                     }
 
-                    auto func_env = std::make_shared<Environment>(env.get());
+                    auto func_env = std::make_shared<Environment>(closure);
 
                     for (std::size_t i = 0; i < params.size(); i++) {
                         func_env->define(params[i].get_lexeme(), args[i].clone());
@@ -400,7 +398,7 @@ private:
     auto invoke_value(Value & value, std::span<const Value> args, const Token & token) -> Value
     {
         auto visitor = overloads{
-                [&](ValueTypes::Callable & callable) { return callable.func(token, args); },
+                [&](ValueTypes::Callable & callable) { return callable.call(token, args); },
                 [&](auto &&) -> Value {
                     throw RuntimeError(token.clone(), "Can only call functions and classes.");
                 },
@@ -420,14 +418,13 @@ private:
 
     auto init_globals() -> void
     {
-        m_globals->define(
-                "clock", make_native_callable([]() -> Value {
-                    using namespace std::chrono;
-                    return static_cast<double>(
-                            duration_cast<seconds>(system_clock::now().time_since_epoch()).count()
-                    );
-                })
-        );
+        m_globals->define("clock", make_native_callable(m_env, []() -> Value {
+                              using namespace std::chrono;
+                              return static_cast<double>(
+                                      duration_cast<seconds>(system_clock::now().time_since_epoch())
+                                              .count()
+                              );
+                          }));
     }
 
     std::unordered_map<const void *, std::size_t> m_locals;
