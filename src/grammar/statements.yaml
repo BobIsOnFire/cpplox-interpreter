@@ -7,7 +7,7 @@ grammar:
 - type: Class
   params:
   - { name: name, type: cpplox::Token }
-  - { name: methods, type: std::vector<cpplox::StmtPtr> }
+  - { name: methods, type: std::vector<cpplox::stmt::Function> }
 
 - type: Expression
   params:

@@ -129,6 +129,31 @@ private:
         });
     }
 
+    auto function_node(std::string_view kind) -> stmt::Function
+    {
+        const auto & name = consume(Identifier, std::format("Expect {} name.", kind));
+        consume(LeftParenthesis, std::format("Expect '(' after {} name.", kind));
+
+        std::vector<Token> params;
+        if (!check(RightParenthesis)) {
+            do {
+                if (params.size() >= MAX_ARGS_COUNT) {
+                    error(peek(),
+                          std::format("Can't have more than {} call arguments.", MAX_ARGS_COUNT));
+                }
+                params.emplace_back(consume(Identifier, "Expect parameter name.").clone());
+            } while (match(Comma));
+        }
+        consume(RightParenthesis, "Expect ')' after parameters.");
+
+        consume(LeftBrace, std::format("Expect '{{' before {} body.", kind));
+        return stmt::Function{
+                .name = name.clone(),
+                .params = std::move(params),
+                .stmts = get_block_statements(),
+        };
+    }
+
     // This is recursive-descent parser, duh!
     // NOLINTBEGIN(misc-no-recursion)
 
@@ -158,9 +183,9 @@ private:
         const auto & name = consume(Identifier, "Expect class name.");
         consume(LeftBrace, "Expect '{' before class body.");
 
-        std::vector<StmtPtr> methods;
+        std::vector<stmt::Function> methods;
         while (!check(RightBrace) && !is_at_end()) {
-            methods.push_back(function("method"));
+            methods.push_back(function_node("method"));
         }
 
         consume(RightBrace, "Expect '}' after class body.");
@@ -170,25 +195,7 @@ private:
 
     auto function(std::string_view kind) -> StmtPtr
     {
-        const auto & name = consume(Identifier, std::format("Expect {} name.", kind));
-        consume(LeftParenthesis, std::format("Expect '(' after {} name.", kind));
-
-        std::vector<Token> params;
-        if (!check(RightParenthesis)) {
-            do {
-                if (params.size() >= MAX_ARGS_COUNT) {
-                    error(peek(),
-                          std::format("Can't have more than {} call arguments.", MAX_ARGS_COUNT));
-                }
-                params.emplace_back(consume(Identifier, "Expect parameter name.").clone());
-            } while (match(Comma));
-        }
-        consume(RightParenthesis, "Expect ')' after parameters.");
-
-        consume(LeftBrace, std::format("Expect '{{' before {} body.", kind));
-        return make_unique_stmt<stmt::Function>(
-                name.clone(), std::move(params), get_block_statements()
-        );
+        return make_unique_stmt<stmt::Function>(function_node(kind));
     }
 
     auto var_declaration() -> StmtPtr

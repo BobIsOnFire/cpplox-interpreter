@@ -53,10 +53,9 @@ public:
         m_scopes.back().insert_or_assign("this", true);
 
         for (const auto & method : stmt.methods) {
-            const auto & m = std::get<stmt::Function>(*method);
-            auto declaration = m.name.get_lexeme() == "init" ? FunctionType::Initializer
-                                                             : FunctionType::Method;
-            resolve_function(m, declaration);
+            auto declaration = method.name.get_lexeme() == "init" ? FunctionType::Initializer
+                                                                  : FunctionType::Method;
+            resolve_function(method, declaration);
         }
 
         end_scope();

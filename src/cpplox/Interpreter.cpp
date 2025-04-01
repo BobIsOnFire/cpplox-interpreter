@@ -103,11 +103,10 @@ public:
         std::unordered_map<std::string, ValueTypes::Callable> methods;
 
         for (const auto & method : stmt.methods) {
-            const auto & func = std::get<stmt::Function>(*method);
-            bool is_initializer = func.name.get_lexeme() == "init";
+            bool is_initializer = method.name.get_lexeme() == "init";
             methods.emplace(
-                    func.name.get_lexeme(),
-                    create_callable(func.name, func.params, func.stmts, is_initializer)
+                    method.name.get_lexeme(),
+                    create_callable(method.name, method.params, method.stmts, is_initializer)
             );
         }
 
