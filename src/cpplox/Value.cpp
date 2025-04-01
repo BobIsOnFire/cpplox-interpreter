@@ -17,7 +17,6 @@ template <class... Ts> struct overloads : Ts...
 
 namespace cpplox {
 
-class Class;
 class Environment;
 class Value;
 
@@ -26,10 +25,12 @@ struct ValueTypes
     using String = std::string;
     using Number = double;
     using Boolean = bool;
+
     struct Null
     {
         auto operator<=>(const Null &) const = default;
     };
+
     struct Callable
     {
         [[nodiscard]] auto call(const Token & caller, std::span<const Value> args) const -> Value;
@@ -44,10 +45,44 @@ struct ValueTypes
         // Callable is never equal to one another (unless it's actually the same object)
         auto operator==(const Callable & other) const -> bool { return this == &other; }
     };
+
+    class Class
+    {
+    public:
+        Class(std::string name, std::unordered_map<std::string, ValueTypes::Callable> methods)
+            : m_name(std::move(name))
+            , m_methods(
+                      std::make_shared<std::unordered_map<std::string, ValueTypes::Callable>>(
+                              std::move(methods)
+                      )
+              )
+        {
+        }
+
+        [[nodiscard]] auto get_name() const -> std::string_view { return m_name; }
+
+        [[nodiscard]] auto find_method(const std::string & name) const
+                -> const ValueTypes::Callable *
+        {
+            auto it = m_methods->find(name);
+            if (it != m_methods->end()) {
+                return &it->second;
+            }
+            return nullptr;
+        }
+
+        // Class is never equal to one another (unless it's actually the same object)
+        auto operator==(const Class & other) const -> bool { return this == &other; }
+
+    private:
+        std::string m_name;
+        std::shared_ptr<std::unordered_map<std::string, ValueTypes::Callable>> m_methods;
+    };
+
     class Object
     {
     public:
-        explicit Object(std::shared_ptr<Class> cls)
+        explicit Object(Class cls)
             : m_class(std::move(cls)) {};
 
         auto get(const Token & name) -> Value;
@@ -60,7 +95,7 @@ struct ValueTypes
         friend class std::formatter<Object>;
 
     private:
-        std::shared_ptr<Class> m_class;
+        Class m_class;
         std::shared_ptr<std::unordered_map<std::string, Value>> m_fields
                 = std::make_shared<std::unordered_map<std::string, Value>>();
     };
@@ -72,6 +107,7 @@ using ValueVariant = std::variant<
         ValueTypes::Boolean,
         ValueTypes::Null,
         ValueTypes::Callable,
+        ValueTypes::Class,
         ValueTypes::Object>;
 
 class Value : public ValueVariant
@@ -98,31 +134,6 @@ auto ValueTypes::Callable::call(const Token & caller, std::span<const Value> arg
 {
     return func(caller, closure.get(), args);
 }
-
-class Class
-{
-public:
-    Class(std::string name, std::unordered_map<std::string, ValueTypes::Callable> methods)
-        : m_name(std::move(name))
-        , m_methods(std::move(methods))
-    {
-    }
-
-    [[nodiscard]] auto get_name() const -> std::string_view { return m_name; }
-
-    [[nodiscard]] auto find_method(const std::string & name) const -> const ValueTypes::Callable *
-    {
-        auto it = m_methods.find(name);
-        if (it != m_methods.end()) {
-            return &it->second;
-        }
-        return nullptr;
-    }
-
-private:
-    std::string m_name;
-    std::unordered_map<std::string, ValueTypes::Callable> m_methods;
-};
 
 auto ValueTypes::Object::get(const Token & name) -> Value
 {
@@ -187,6 +198,18 @@ template <> struct std::formatter<cpplox::ValueTypes::Callable> : std::formatter
     }
 };
 
+template <> struct std::formatter<cpplox::ValueTypes::Class> : std::formatter<std::string_view>
+{
+    constexpr auto parse(std::format_parse_context & ctx) { return ctx.begin(); }
+
+    auto format(const cpplox::ValueTypes::Class & cls, std::format_context & ctx) const
+    {
+        return std::format_to(
+                ctx.out(), "<class {} at {}>", cls.get_name(), static_cast<const void *>(&cls)
+        );
+    }
+};
+
 template <> struct std::formatter<cpplox::ValueTypes::Object> : std::formatter<std::string_view>
 {
     constexpr auto parse(std::format_parse_context & ctx) { return ctx.begin(); }
@@ -196,7 +219,7 @@ template <> struct std::formatter<cpplox::ValueTypes::Object> : std::formatter<s
         return std::format_to(
                 ctx.out(),
                 "<{} instance at {}>",
-                obj.m_class->get_name(),
+                obj.m_class.get_name(),
                 static_cast<const void *>(&obj)
         );
     }

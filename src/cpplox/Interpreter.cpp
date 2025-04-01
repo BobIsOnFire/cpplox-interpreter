@@ -110,31 +110,10 @@ public:
             );
         }
 
-        auto cls = std::make_shared<Class>(stmt.name.get_lexeme(), std::move(methods));
-
-        m_env->define(stmt.name.get_lexeme(), ValueTypes::Null{});
-        m_env->get(stmt.name) = ValueTypes::Callable{
-                .closure = m_env,
-                .func = [this,
-                         cls](const Token & caller,
-                              Environment * /* closure */,
-                              std::span<const Value> args) -> Value {
-                    try {
-                        auto obj = ValueTypes::Object(cls);
-
-                        // initialize object
-                        auto init = obj.get_method("init");
-                        if (init.has_value()) {
-                            return init.value().call(caller, args);
-                        }
-                        return obj;
-                    }
-                    catch (...) {
-                        m_env->clear();
-                        throw;
-                    }
-                },
-        };
+        m_env->define(
+                stmt.name.get_lexeme(),
+                ValueTypes::Class(stmt.name.get_lexeme(), std::move(methods))
+        );
     }
 
     auto operator()(const stmt::Function & stmt) -> void
@@ -398,6 +377,7 @@ private:
     {
         auto visitor = overloads{
                 [&](ValueTypes::Callable & callable) { return callable.call(token, args); },
+                [&](ValueTypes::Class & cls) { return create_class_instance(cls, args, token); },
                 [&](auto &&) -> Value {
                     throw RuntimeError(token.clone(), "Can only call functions and classes.");
                 },
@@ -424,6 +404,20 @@ private:
                                               .count()
                               );
                           }));
+    }
+
+    auto create_class_instance(
+            const ValueTypes::Class & cls, std::span<const Value> args, const Token & token
+    ) -> Value
+    {
+        auto obj = ValueTypes::Object(cls);
+
+        // initialize object
+        auto init = obj.get_method("init");
+        if (init.has_value()) {
+            return init.value().call(token, args);
+        }
+        return obj;
     }
 
     std::unordered_map<const void *, std::size_t> m_locals;
