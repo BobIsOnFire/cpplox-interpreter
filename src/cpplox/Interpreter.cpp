@@ -100,41 +100,44 @@ public:
 
     auto operator()(const stmt::Class & stmt) -> void
     {
+        std::unordered_map<std::string, ValueTypes::Callable> methods;
+
+        for (const auto & method : stmt.methods) {
+            const auto & func = std::get<stmt::Function>(*method);
+            bool is_initializer = func.name.get_lexeme() == "init";
+            methods.emplace(
+                    func.name.get_lexeme(),
+                    create_callable(func.name, func.params, func.stmts, is_initializer)
+            );
+        }
+
+        auto cls = std::make_shared<Class>(stmt.name.get_lexeme(), std::move(methods));
+
         m_env->define(stmt.name.get_lexeme(), ValueTypes::Null{});
         m_env->get(stmt.name) = ValueTypes::Callable{
                 .func = [this,
-                         &stmt,
+                         cls,
                          env = m_env](const Token & caller, std::span<const Value> args) -> Value {
                     auto obj_env = std::make_shared<Environment>(env.get());
 
                     std::swap(m_env, obj_env);
                     ScopeExit exit{[&]() { std::swap(m_env, obj_env); }};
 
-                    auto obj = ValueTypes::Object{};
-                    m_env->define("this", obj);
-
-                    Token init_tok("init", stmt.name.get_line(), TokenType::Identifier);
-                    obj.set(init_tok,
-                            make_native_callable([]() -> Value { return ValueTypes::Null{}; }));
-
-                    for (const auto & method : stmt.methods) {
-                        const auto & func = std::get<stmt::Function>(*method);
-                        bool is_initializer = func.name.get_lexeme() == "init";
-                        obj.set(func.name,
-                                create_callable(func.name, func.params, func.stmts, is_initializer)
-                        );
-                    }
-
                     try {
+                        auto obj = ValueTypes::Object(cls);
+                        m_env->define("this", obj);
+
                         // initialize object
-                        invoke_value(obj.get(init_tok), args, caller);
+                        const auto * init = cls->find_method("init");
+                        if (init) {
+                            return init->func(caller, args);
+                        }
+                        return obj;
                     }
                     catch (...) {
                         m_env->clear();
                         throw;
                     }
-
-                    return obj;
                 },
         };
     }
@@ -350,9 +353,9 @@ private:
             std::span<const Token> params,
             std::span<const StmtPtr> stmts,
             bool is_initializer = false
-    ) -> Value
+    ) -> ValueTypes::Callable
     {
-        return ValueTypes::Callable{
+        return {
                 // FIXME: In REPL mode, if function was defined in a different line input,
                 // "stmts" might already be destroyed when we actually get to calling it.
                 // Need to have statements globally available somehow to support REPL mode.

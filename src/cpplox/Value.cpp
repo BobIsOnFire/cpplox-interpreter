@@ -17,6 +17,7 @@ template <class... Ts> struct overloads : Ts...
 
 namespace cpplox {
 
+class Class;
 class Value;
 
 struct ValueTypes
@@ -38,13 +39,19 @@ struct ValueTypes
     class Object
     {
     public:
-        auto get(const Token & name) -> Value &;
+        explicit Object(std::shared_ptr<Class> cls)
+            : m_class(std::move(cls)) {};
+
+        auto get(const Token & name) -> Value;
         auto set(const Token & name, Value && value) -> void;
 
         // Object is never equal to one another (unless it's actually the same object)
         auto operator==(const Object & other) const -> bool { return this == &other; }
 
+        friend class std::formatter<Object>;
+
     private:
+        std::shared_ptr<Class> m_class;
         std::shared_ptr<std::unordered_map<std::string, Value>> m_fields
                 = std::make_shared<std::unordered_map<std::string, Value>>();
     };
@@ -78,11 +85,41 @@ public:
     ~Value() = default;
 };
 
-auto ValueTypes::Object::get(const Token & name) -> Value &
+class Class
+{
+public:
+    Class(std::string name, std::unordered_map<std::string, ValueTypes::Callable> methods)
+        : m_name(std::move(name))
+        , m_methods(std::move(methods))
+    {
+    }
+
+    [[nodiscard]] auto get_name() const -> std::string_view { return m_name; }
+
+    [[nodiscard]] auto find_method(const std::string & name) const -> const ValueTypes::Callable *
+    {
+        auto it = m_methods.find(name);
+        if (it != m_methods.end()) {
+            return &it->second;
+        }
+        return nullptr;
+    }
+
+private:
+    std::string m_name;
+    std::unordered_map<std::string, ValueTypes::Callable> m_methods;
+};
+
+auto ValueTypes::Object::get(const Token & name) -> Value
 {
     auto it = m_fields->find(name.get_lexeme());
     if (it != m_fields->end()) {
         return it->second;
+    }
+
+    const auto * method = m_class->find_method(name.get_lexeme());
+    if (method != nullptr) {
+        return *method;
     }
 
     throw RuntimeError(name.clone(), std::format("Undefined property '{}'.", name.get_lexeme()));
@@ -123,6 +160,31 @@ auto make_native_callable(Func && f) -> ValueTypes::Callable
 
 } // namespace cpplox
 
+template <> struct std::formatter<cpplox::ValueTypes::Callable> : std::formatter<std::string_view>
+{
+    constexpr auto parse(std::format_parse_context & ctx) { return ctx.begin(); }
+
+    auto format(const cpplox::ValueTypes::Callable & callable, std::format_context & ctx) const
+    {
+        return std::format_to(ctx.out(), "<callable at {}>", static_cast<const void *>(&callable));
+    }
+};
+
+template <> struct std::formatter<cpplox::ValueTypes::Object> : std::formatter<std::string_view>
+{
+    constexpr auto parse(std::format_parse_context & ctx) { return ctx.begin(); }
+
+    auto format(const cpplox::ValueTypes::Object & obj, std::format_context & ctx) const
+    {
+        return std::format_to(
+                ctx.out(),
+                "<{} instance at {}>",
+                obj.m_class->get_name(),
+                static_cast<const void *>(&obj)
+        );
+    }
+};
+
 template <> struct std::formatter<cpplox::Value> : std::formatter<std::string_view>
 {
     constexpr auto parse(std::format_parse_context & ctx) { return ctx.begin(); }
@@ -131,16 +193,6 @@ template <> struct std::formatter<cpplox::Value> : std::formatter<std::string_vi
     {
         const auto formatter = overloads{
                 [&](const cpplox::ValueTypes::Null &) { return std::format_to(ctx.out(), "nil"); },
-                [&](const cpplox::ValueTypes::Callable & callable) {
-                    return std::format_to(
-                            ctx.out(), "<callable at {}>", static_cast<const void *>(&callable)
-                    );
-                },
-                [&](const cpplox::ValueTypes::Object & obj) {
-                    return std::format_to(
-                            ctx.out(), "<object at {}>", static_cast<const void *>(&obj)
-                    );
-                },
                 [&](const auto & value) { return std::format_to(ctx.out(), "{}", value); },
         };
 
