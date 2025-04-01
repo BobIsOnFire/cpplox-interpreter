@@ -102,18 +102,18 @@ public:
     {
         m_env->define(stmt.name.get_lexeme(), ValueTypes::Null{});
         m_env->get(stmt.name) = ValueTypes::Callable{
-                // FIXME: should dynamically check arg number in initializer call instead
-                .arity = 0,
-                .func = [this, &stmt, env = m_env](std::span<const Value> args) -> Value {
-                    auto class_env = std::make_shared<Environment>(env.get());
+                .func = [this,
+                         &stmt,
+                         env = m_env](const Token & caller, std::span<const Value> args) -> Value {
+                    auto obj_env = std::make_shared<Environment>(env.get());
 
-                    std::swap(m_env, class_env);
-                    ScopeExit exit{[&]() { std::swap(m_env, class_env); }};
+                    std::swap(m_env, obj_env);
+                    ScopeExit exit{[&]() { std::swap(m_env, obj_env); }};
 
                     auto obj = ValueTypes::Object{};
                     m_env->define("this", obj);
 
-                    Token init_tok("init", stmt.name.get_line(), TokenType::Identifier, "init");
+                    Token init_tok("init", stmt.name.get_line(), TokenType::Identifier);
                     obj.set(init_tok,
                             make_native_callable([]() -> Value { return ValueTypes::Null{}; }));
 
@@ -125,8 +125,14 @@ public:
                         );
                     }
 
-                    // initialize object
-                    invoke_value(obj.get(init_tok), args, init_tok);
+                    try {
+                        // initialize object
+                        invoke_value(obj.get(init_tok), args, caller);
+                    }
+                    catch (...) {
+                        m_env->clear();
+                        throw;
+                    }
 
                     return obj;
                 },
@@ -347,13 +353,23 @@ private:
     ) -> Value
     {
         return ValueTypes::Callable{
-                .arity = params.size(),
                 // FIXME: In REPL mode, if function was defined in a different line input,
                 // "stmts" might already be destroyed when we actually get to calling it.
                 // Need to have statements globally available somehow to support REPL mode.
                 .func = [this, &name, params, stmts, is_initializer, env = m_env](
-                                std::span<const Value> args
+                                const Token & caller, std::span<const Value> args
                         ) -> Value {
+                    if (args.size() != params.size()) {
+                        throw RuntimeError(
+                                caller.clone(),
+                                std::format(
+                                        "Expected {} arguments but got {}.",
+                                        params.size(),
+                                        args.size()
+                                )
+                        );
+                    }
+
                     auto func_env = std::make_shared<Environment>(env.get());
 
                     for (std::size_t i = 0; i < params.size(); i++) {
@@ -369,7 +385,7 @@ private:
                     }
 
                     if (is_initializer) {
-                        Token this_tok("this", name.get_line(), TokenType::This, "this");
+                        Token this_tok("this", name.get_line(), TokenType::This);
                         return_value = func_env->get_at(this_tok, 0);
                     }
 
@@ -381,28 +397,13 @@ private:
     auto invoke_value(Value & value, std::span<const Value> args, const Token & token) -> Value
     {
         auto visitor = overloads{
-                [&](ValueTypes::Callable & callable) {
-                    return invoke_callable(callable, args, token);
-                },
+                [&](ValueTypes::Callable & callable) { return callable.func(token, args); },
                 [&](auto &&) -> Value {
                     throw RuntimeError(token.clone(), "Can only call functions and classes.");
                 },
         };
 
         return std::visit(visitor, value);
-    }
-
-    auto invoke_callable(
-            ValueTypes::Callable & callable, std::span<const Value> args, const Token & token
-    ) -> Value
-    {
-        if (args.size() != callable.arity) {
-            throw RuntimeError(
-                    token.clone(),
-                    std::format("Expected {} arguments but got {}.", callable.arity, args.size())
-            );
-        }
-        return callable.func(args);
     }
 
     auto lookup_variable(const Token & name, const alternative_of<Expr> auto & expr) -> Value &

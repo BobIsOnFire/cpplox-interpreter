@@ -30,8 +30,7 @@ struct ValueTypes
     };
     struct Callable
     {
-        std::size_t arity;
-        std::function<Value(std::span<const Value>)> func;
+        std::function<Value(const Token &, std::span<const Value>)> func;
 
         // Callable is never equal to one another (unless it's actually the same object)
         auto operator==(const Callable & other) const -> bool { return this == &other; }
@@ -102,14 +101,22 @@ concept NativeCallable = requires(T && f, Args &&... args) {
 template <typename Func, std::size_t... Is>
 auto make_runtime_caller(Func && f, std::index_sequence<Is...> /* ids */)
 {
-    return [f = std::forward<Func>(f)](std::span<const Value> args) { return f(args[Is]...); };
+    return [f = std::forward<Func>(f)](const Token & caller, std::span<const Value> args) {
+        if (args.size() != sizeof...(Is)) {
+            throw RuntimeError(
+                    caller.clone(),
+                    std::format("Expected {} arguments but got {}.", sizeof...(Is), args.size())
+            );
+        }
+
+        return f(args[Is]...);
+    };
 }
 
 template <std::same_as<Value>... Args, NativeCallable<Args...> Func>
 auto make_native_callable(Func && f) -> ValueTypes::Callable
 {
     return {
-            .arity = sizeof...(Args),
             .func = make_runtime_caller(std::forward<Func>(f), std::index_sequence_for<Args...>{}),
     };
 }

@@ -1,7 +1,7 @@
 class Bagel {
-  init() {
-    this.taste = "good";
-    this.filling = "cream cheese";
+  init(taste, filling) {
+    this.taste = taste;
+    this.filling = filling;
   }
 
   describe() {
@@ -13,7 +13,7 @@ class Bagel {
   }
 }
 
-var bagel = Bagel();
+var bagel = Bagel("good", "cream cheese");
 bagel.eat();
 
 print bagel.describe();
