@@ -7,6 +7,17 @@ import :Expr;
 import :ExprSerializer;
 import :Stmt;
 
+namespace {
+
+template <class T, typename Var>
+concept alternative_of = requires(const Var & var) {
+    []<typename... Args>
+        requires(std::same_as<T, Args> || ...)
+    (const std::variant<Args...> &) {}(var);
+};
+
+} // namespace
+
 namespace cpplox {
 
 export class StmtSerializer
@@ -14,7 +25,8 @@ export class StmtSerializer
 public:
     explicit StmtSerializer(YAML::Emitter & emitter)
         : m_emitter(emitter)
-    {}
+    {
+    }
 
 {%- for elem in data.grammar %}
     auto operator()(const stmt::{{ elem.type }} & stmt) -> void
@@ -48,7 +60,7 @@ public:
         std::visit(ExprSerializer{m_emitter}, *expr);
     }
 
-    auto operator()(const Token& token) -> void
+    auto operator()(const Token & token) -> void
     {
         m_emitter << YAML::BeginMap;
         m_emitter << YAML::Key << "type" << YAML::Value << std::format("{}", token.get_type());
@@ -62,7 +74,7 @@ public:
         m_emitter << YAML::EndMap;
     }
 
-    auto operator()(const Token::Literal& literal) -> void
+    auto operator()(const Token::Literal & literal) -> void
     {
         m_emitter << std::format("{}", literal);
     }
@@ -81,9 +93,15 @@ public:
     {
         if (item.has_value()) {
             this->operator()(item.value());
-        } else {
+        }
+        else {
             m_emitter << "<empty>";
         }
+    }
+
+    auto operator()(const alternative_of<Expr> auto & expr) -> void
+    {
+        ExprSerializer{m_emitter}.operator()(expr);
     }
 
 private:

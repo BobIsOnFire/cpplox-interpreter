@@ -4,6 +4,10 @@ class Breakfast {
     this.bread = bread;
   }
 
+  serve(name) {
+    print "Enjoy your " + this.meat + " and " + this.bread + ", " + name + ".";
+  }
+
   // ...
 }
 

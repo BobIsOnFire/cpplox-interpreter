@@ -100,19 +100,43 @@ public:
 
     auto operator()(const stmt::Class & stmt) -> void
     {
+        auto super = stmt.super.transform([this](const expr::Variable & super) {
+            return std::visit(
+                    overloads{
+                            [](ValueTypes::Class cls) { return cls; },
+                            [&](auto &&) -> ValueTypes::Class {
+                                throw RuntimeError(
+                                        super.name.clone(), "Superclass must be a class."
+                                );
+                            },
+                    },
+                    this->operator()(super)
+            );
+        });
+
         std::unordered_map<std::string, ValueTypes::Callable> methods;
 
-        for (const auto & method : stmt.methods) {
-            bool is_initializer = method.name.get_lexeme() == "init";
-            methods.emplace(
-                    method.name.get_lexeme(),
-                    create_callable(method.name, method.params, method.stmts, is_initializer)
-            );
+        {
+            auto class_env = std::make_shared<Environment>(m_env.get());
+            std::swap(m_env, class_env);
+            ScopeExit exit{[&]() { std::swap(m_env, class_env); }};
+
+            if (super.has_value()) {
+                m_env->define("super", super.value());
+            }
+
+            for (const auto & method : stmt.methods) {
+                bool is_initializer = method.name.get_lexeme() == "init";
+                methods.emplace(
+                        method.name.get_lexeme(),
+                        create_callable(method.name, method.params, method.stmts, is_initializer)
+                );
+            }
         }
 
         m_env->define(
                 stmt.name.get_lexeme(),
-                ValueTypes::Class(stmt.name.get_lexeme(), std::move(methods))
+                ValueTypes::Class(stmt.name.get_lexeme(), std::move(super), std::move(methods))
         );
     }
 
@@ -245,6 +269,33 @@ public:
     auto operator()(const expr::Variable & expr) -> Value
     {
         return lookup_variable(expr.name, expr).clone();
+    }
+
+    auto operator()(const expr::Super & expr) -> Value
+    {
+        std::size_t distance = m_locals.at(&expr);
+        auto super = std::visit(
+                overloads{
+                        [](ValueTypes::Class & cls) { return cls; },
+                        [&](auto &&) -> ValueTypes::Class {
+                            throw RuntimeError(expr.keyword.clone(), "'super' is not a class.");
+                        },
+                },
+                m_env->get_at(expr.keyword, distance)
+        );
+
+        Token this_tok("this", expr.keyword.get_line(), TokenType::This);
+        auto this_obj = m_env->get_at(this_tok, distance - 1);
+
+        const auto * method = super.find_method(expr.method.get_lexeme());
+        if (method == nullptr) {
+            throw RuntimeError(
+                    expr.method.clone(),
+                    std::format("Undefined property '{}'.", expr.method.get_lexeme())
+            );
+        }
+
+        return method->bind(std::move(this_obj));
     }
 
     auto operator()(const expr::This & expr) -> Value

@@ -34,6 +34,7 @@ struct ValueTypes
     struct Callable
     {
         [[nodiscard]] auto call(const Token & caller, std::span<const Value> args) const -> Value;
+        [[nodiscard]] auto bind(Value value) const -> Callable;
 
         std::shared_ptr<Environment> closure;
         std::function<
@@ -49,8 +50,13 @@ struct ValueTypes
     class Class
     {
     public:
-        Class(std::string name, std::unordered_map<std::string, ValueTypes::Callable> methods)
+        Class(std::string name,
+              std::optional<Class> super,
+              std::unordered_map<std::string, ValueTypes::Callable> methods)
             : m_name(std::move(name))
+            , m_super(std::move(super).transform([](Class && val) {
+                return std::make_shared<Class>(std::move(val));
+            }))
             , m_methods(
                       std::make_shared<std::unordered_map<std::string, ValueTypes::Callable>>(
                               std::move(methods)
@@ -61,6 +67,7 @@ struct ValueTypes
 
         [[nodiscard]] auto get_name() const -> std::string_view { return m_name; }
 
+        // NOLINTNEXTLINE(misc-no-recursion)
         [[nodiscard]] auto find_method(const std::string & name) const
                 -> const ValueTypes::Callable *
         {
@@ -68,6 +75,11 @@ struct ValueTypes
             if (it != m_methods->end()) {
                 return &it->second;
             }
+
+            if (m_super.has_value()) {
+                return m_super.value()->find_method(name);
+            }
+
             return nullptr;
         }
 
@@ -76,6 +88,7 @@ struct ValueTypes
 
     private:
         std::string m_name;
+        std::optional<std::shared_ptr<Class>> m_super;
         std::shared_ptr<std::unordered_map<std::string, ValueTypes::Callable>> m_methods;
     };
 
@@ -148,6 +161,15 @@ auto ValueTypes::Object::get(const Token & name) -> Value
     }
 
     throw RuntimeError(name.clone(), std::format("Undefined property '{}'.", name.get_lexeme()));
+}
+
+auto ValueTypes::Object::get_method(const std::string & name) -> std::optional<ValueTypes::Callable>
+{
+    const auto * method = m_class.find_method(name);
+    if (method != nullptr) {
+        return method->bind(*this);
+    }
+    return std::nullopt;
 }
 
 auto ValueTypes::Object::set(const Token & name, Value && value) -> void

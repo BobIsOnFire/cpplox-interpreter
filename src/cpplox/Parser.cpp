@@ -181,6 +181,15 @@ private:
     auto class_declaration() -> StmtPtr
     {
         const auto & name = consume(Identifier, "Expect class name.");
+
+        auto super = match(Less)
+                ? std::optional(
+                          expr::Variable{
+                                  .name = consume(Identifier, "Expect superclass name.").clone(),
+                          }
+                  )
+                : std::nullopt;
+
         consume(LeftBrace, "Expect '{' before class body.");
 
         std::vector<stmt::Function> methods;
@@ -190,7 +199,7 @@ private:
 
         consume(RightBrace, "Expect '}' after class body.");
 
-        return make_unique_stmt<stmt::Class>(name.clone(), std::move(methods));
+        return make_unique_stmt<stmt::Class>(name.clone(), std::move(super), std::move(methods));
     }
 
     auto function(std::string_view kind) -> StmtPtr
@@ -492,6 +501,14 @@ private:
 
         if (match_any(Number, String)) {
             return make_unique_expr<expr::Literal>(previous().get_literal().clone());
+        }
+
+        if (match(Super)) {
+            const auto & keyword = previous();
+            consume(Dot, "Expect '.' after 'super'.");
+            return make_unique_expr<expr::Super>(
+                    keyword.clone(), consume(Identifier, "Expect superclass method name.").clone()
+            );
         }
 
         if (match(This)) {

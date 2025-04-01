@@ -42,6 +42,11 @@ grammar:
   - { name: name, type: cpplox::Token }
   - { name: value }
 
+- type: Super
+  params:
+  - { name: keyword, type: cpplox::Token }
+  - { name: method, type: cpplox::Token }
+
 - type: This
   params:
   - { name: keyword, type: cpplox::Token }

@@ -49,8 +49,22 @@ public:
         declare(stmt.name);
         define(stmt.name);
 
+        if (stmt.super.has_value()) {
+            const auto & var = stmt.super.value();
+            if (stmt.name.get_lexeme() == var.name.get_lexeme()) {
+                Diagnostics::instance()->error(var.name, "A class cannot inherit from itself.");
+            }
+
+            m_current_class = ClassType::Subclass;
+            operator()(var);
+        }
+
         begin_scope();
         m_scopes.back().insert_or_assign("this", true);
+
+        if (stmt.super.has_value()) {
+            m_scopes.back().insert_or_assign("super", true);
+        }
 
         for (const auto & method : stmt.methods) {
             auto declaration = method.name.get_lexeme() == "init" ? FunctionType::Initializer
@@ -154,6 +168,20 @@ public:
         resolve(*expr.object);
     }
 
+    auto operator()(const expr::Super & expr) -> void
+    {
+        if (m_current_class == ClassType::None) {
+            Diagnostics::instance()->error(expr.keyword, "Can't use 'super' outside of a class.");
+            return;
+        }
+        if (m_current_class == ClassType::Class) {
+            Diagnostics::instance()->error(
+                    expr.keyword, "Can't use 'super' in a class with no superclass."
+            );
+        }
+        resolve_local(expr, expr.keyword);
+    }
+
     auto operator()(const expr::This & expr) -> void
     {
         if (m_current_class == ClassType::None) {
@@ -192,6 +220,7 @@ private:
     {
         None,
         Class,
+        Subclass,
     };
 
     auto resolve(const Stmt & stmt) -> void { std::visit(*this, stmt); }

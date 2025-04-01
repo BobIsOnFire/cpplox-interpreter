@@ -1,0 +1,21 @@
+class Doughnut {
+  cook() {
+    print "Fry until golden brown.";
+  }
+
+  recipe() {
+    print "Prepare ingredients.";
+    this.cook();
+  }
+}
+
+class BostonCream < Doughnut {
+  cook() {
+    print "Fry until golden brown.";
+    print "Add cream.";
+  }
+}
+
+Doughnut().recipe();
+print "----------";
+BostonCream().recipe();
