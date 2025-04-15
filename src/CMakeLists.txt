@@ -1,21 +1,13 @@
-add_executable(grammar_generator)
-target_sources(grammar_generator
-  PRIVATE
-    FILE_SET cxx_modules TYPE CXX_MODULES FILES
-      grammar/jinja2_yaml_binding.cpp
-  PRIVATE 
-    grammar/generate.cpp
-)
-target_link_libraries(grammar_generator PRIVATE jinja2cpp-mod yaml-cpp-mod)
+find_package(Python3 REQUIRED)
 
 foreach(source_name IN ITEMS Expr.cpp ExprSerializer.cpp)
   add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
-    COMMAND grammar_generator
+    COMMAND Python3::Interpreter grammar/generate.py
       grammar/expressions.yaml
       grammar/${source_name}.j2
       ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
     DEPENDS
-      grammar_generator
+      grammar/generate.py
       grammar/expressions.yaml
       grammar/${source_name}.j2
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -24,12 +16,12 @@ endforeach()
 
 foreach(source_name IN ITEMS Stmt.cpp StmtSerializer.cpp)
   add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
-    COMMAND grammar_generator
+    COMMAND Python3::Interpreter grammar/generate.py
       grammar/statements.yaml
       grammar/${source_name}.j2
       ${CMAKE_CURRENT_BINARY_DIR}/${source_name}
     DEPENDS
-      grammar_generator
+      grammar/generate.py
       grammar/statements.yaml
       grammar/${source_name}.j2
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

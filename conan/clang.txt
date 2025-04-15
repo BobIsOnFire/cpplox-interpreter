@@ -12,8 +12,6 @@ compiler.libcxx = libc++
 ### C++ standard selection.
 # Try to use same cppstd for project and for deps, as there might be ABI breaks between standards
 compiler.cppstd = 23
-# NOTE: jinja2cpp doesn't compile with c++20 or c++23, downgrade cppstd for it
-jinja2cpp/*:compiler.cppstd = 17
 
 [conf]
 tools.build:compiler_executables = {'c': '{{ compiler_exe }}', 'cpp': '{{ compiler_exe }}++'}
