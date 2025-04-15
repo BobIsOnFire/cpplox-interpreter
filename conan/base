@@ -1,0 +1,8 @@
+[settings]
+os = {{ detect_api.detect_os() }}
+arch = {{ detect_api.detect_arch() }}
+build_type = Debug
+
+[conf]
+&:tools.cmake.cmake_layout:build_folder_vars += options.sanitize
+&:tools.cmake.cmaketoolchain:generator = Ninja Multi-Config
