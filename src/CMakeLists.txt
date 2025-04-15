@@ -60,7 +60,6 @@ target_sources(cpplox
 )
 
 target_link_libraries(cpplox PRIVATE
-  fast_float-mod
   magic_enum-mod
   yaml-cpp-mod
 )

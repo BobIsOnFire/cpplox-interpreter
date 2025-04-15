@@ -2,8 +2,6 @@ module cpplox:Scanner;
 
 import std;
 
-import fast_float;
-
 import :Diagnostics;
 import :Token;
 
@@ -166,7 +164,7 @@ private:
         }
 
         double num = 0;
-        auto answer = fast_float::from_chars(&m_source[m_start], &m_source[m_current], num);
+        auto answer = std::from_chars(&m_source[m_start], &m_source[m_current], num);
 
         if (answer.ec != std::errc()) {
             error("Parsing failure");
