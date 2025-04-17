@@ -1,3 +1,3 @@
-<Outer instance at 0x7ba09e003e90>
-<Outer instance at 0x7ba09e004a90>
-<Inner instance at 0x7ba09e005e90>
+<object #0 (Outer instance)>
+<object #0 (Outer instance)>
+<object #1 (Inner instance)>

@@ -51,6 +51,8 @@ struct ValueTypes
         // Callable is never equal to one another (unless it's actually the same object)
         auto operator==(const Callable & other) const -> bool { return m_id == other.m_id; }
 
+        friend class std::formatter<Callable>;
+
     private:
         std::shared_ptr<Environment> m_closure;
         func_type m_func;
@@ -97,6 +99,8 @@ struct ValueTypes
 
         // Class is never equal to one another (unless it's actually the same object)
         auto operator==(const Class & other) const -> bool { return m_id == other.m_id; }
+
+        friend class std::formatter<Class>;
 
     private:
         std::string m_name;
@@ -238,7 +242,7 @@ template <> struct std::formatter<cpplox::ValueTypes::Callable> : std::formatter
 
     auto format(const cpplox::ValueTypes::Callable & callable, std::format_context & ctx) const
     {
-        return std::format_to(ctx.out(), "<callable at {}>", static_cast<const void *>(&callable));
+        return std::format_to(ctx.out(), "<callable #{}>", callable.m_id);
     }
 };
 
@@ -248,9 +252,7 @@ template <> struct std::formatter<cpplox::ValueTypes::Class> : std::formatter<st
 
     auto format(const cpplox::ValueTypes::Class & cls, std::format_context & ctx) const
     {
-        return std::format_to(
-                ctx.out(), "<class {} at {}>", cls.get_name(), static_cast<const void *>(&cls)
-        );
+        return std::format_to(ctx.out(), "<class #{} ({})>", cls.m_id, cls.m_name);
     }
 };
 
@@ -261,10 +263,7 @@ template <> struct std::formatter<cpplox::ValueTypes::Object> : std::formatter<s
     auto format(const cpplox::ValueTypes::Object & obj, std::format_context & ctx) const
     {
         return std::format_to(
-                ctx.out(),
-                "<{} instance at {}>",
-                obj.m_class.get_name(),
-                static_cast<const void *>(&obj)
+                ctx.out(), "<object #{} ({} instance)>", obj.m_id, obj.m_class.get_name()
         );
     }
 };
