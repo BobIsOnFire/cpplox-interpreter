@@ -31,20 +31,32 @@ struct ValueTypes
         auto operator<=>(const Null &) const = default;
     };
 
-    struct Callable
+    class Callable
     {
+    public:
+        using func_type = std::function<
+                Value(const Token & /* caller */,
+                      Environment * /* closure */,
+                      std::span<const Value> /* args */)>;
+
+        Callable(std::shared_ptr<Environment> closure, func_type func)
+            : m_closure(std::move(closure))
+            , m_func(std::move(func))
+        {
+        }
+
         [[nodiscard]] auto call(const Token & caller, std::span<const Value> args) const -> Value;
         [[nodiscard]] auto bind(Value value) const -> Callable;
 
-        std::shared_ptr<Environment> closure;
-        std::function<
-                Value(const Token & /* caller */,
-                      Environment * /* closure */,
-                      std::span<const Value> /* args */)>
-                func;
-
         // Callable is never equal to one another (unless it's actually the same object)
-        auto operator==(const Callable & other) const -> bool { return this == &other; }
+        auto operator==(const Callable & other) const -> bool { return m_id == other.m_id; }
+
+    private:
+        std::shared_ptr<Environment> m_closure;
+        func_type m_func;
+
+        static std::size_t s_id;
+        std::size_t m_id = s_id++;
     };
 
     class Class
@@ -84,12 +96,15 @@ struct ValueTypes
         }
 
         // Class is never equal to one another (unless it's actually the same object)
-        auto operator==(const Class & other) const -> bool { return this == &other; }
+        auto operator==(const Class & other) const -> bool { return m_id == other.m_id; }
 
     private:
         std::string m_name;
         std::optional<std::shared_ptr<Class>> m_super;
         std::shared_ptr<std::unordered_map<std::string, ValueTypes::Callable>> m_methods;
+
+        static std::size_t s_id;
+        std::size_t m_id = s_id++;
     };
 
     class Object
@@ -103,7 +118,7 @@ struct ValueTypes
         auto set(const Token & name, Value && value) -> void;
 
         // Object is never equal to one another (unless it's actually the same object)
-        auto operator==(const Object & other) const -> bool { return this == &other; }
+        auto operator==(const Object & other) const -> bool { return m_id == other.m_id; }
 
         friend class std::formatter<Object>;
 
@@ -111,6 +126,9 @@ struct ValueTypes
         Class m_class;
         std::shared_ptr<std::unordered_map<std::string, Value>> m_fields
                 = std::make_shared<std::unordered_map<std::string, Value>>();
+
+        static std::size_t s_id;
+        std::size_t m_id = s_id++;
     };
 };
 
@@ -143,9 +161,13 @@ public:
     ~Value() = default;
 };
 
+std::size_t ValueTypes::Callable::s_id = 0;
+std::size_t ValueTypes::Class::s_id = 0;
+std::size_t ValueTypes::Object::s_id = 0;
+
 auto ValueTypes::Callable::call(const Token & caller, std::span<const Value> args) const -> Value
 {
-    return func(caller, closure.get(), args);
+    return m_func(caller, m_closure.get(), args);
 }
 
 auto ValueTypes::Object::get(const Token & name) -> Value
@@ -203,8 +225,8 @@ auto make_native_callable(const std::shared_ptr<Environment> & closure, Func && 
         -> ValueTypes::Callable
 {
     return {
-            .closure = closure,
-            .func = make_runtime_caller(std::forward<Func>(f), std::index_sequence_for<Args...>{}),
+            closure,
+            make_runtime_caller(std::forward<Func>(f), std::index_sequence_for<Args...>{}),
     };
 }
 

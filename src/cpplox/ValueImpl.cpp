@@ -9,9 +9,9 @@ namespace cpplox {
 
 auto ValueTypes::Callable::bind(Value value) const -> ValueTypes::Callable
 {
-    auto this_closure = std::make_shared<Environment>(closure.get());
+    auto this_closure = std::make_shared<Environment>(m_closure.get());
     this_closure->define("this", std::move(value));
-    return ValueTypes::Callable{.closure = std::move(this_closure), .func = func};
+    return {std::move(this_closure), m_func};
 }
 
 } // namespace cpplox

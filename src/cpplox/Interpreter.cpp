@@ -381,14 +381,13 @@ private:
     ) -> ValueTypes::Callable
     {
         return {
-                .closure = m_env,
+                m_env,
                 // FIXME: In REPL mode, if function was defined in a different line input,
                 // "stmts" might already be destroyed when we actually get to calling it.
                 // Need to have statements globally available somehow to support REPL mode.
-                .func
-                = [this, &name, params, stmts, is_initializer](
-                          const Token & caller, Environment * closure, std::span<const Value> args
-                  ) -> Value {
+                [this, &name, params, stmts, is_initializer](
+                        const Token & caller, Environment * closure, std::span<const Value> args
+                ) -> Value {
                     if (args.size() != params.size()) {
                         throw RuntimeError(
                                 caller.clone(),
