@@ -462,12 +462,12 @@ private:
     {
         auto obj = ValueTypes::Object(cls);
 
-        // initialize object
-        auto init = obj.get_method("init");
-        if (init.has_value()) {
-            return init.value().call(token, args);
-        }
-        return obj;
+        auto maybe_init = obj.get_method("init");
+        auto init = maybe_init.has_value()
+                ? maybe_init.value()
+                : create_callable(token, {}, {}, /* is_initializer */ true).bind(obj);
+
+        return init.call(token, args);
     }
 
     std::unordered_map<const void *, std::size_t> m_locals;
