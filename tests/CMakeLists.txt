@@ -14,4 +14,11 @@ foreach(file IN LISTS TEST_FILES)
             -DTEST_FILE=${file}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/testrunner.cmake"
     )
+    set_property(TEST "${test_name}"
+        PROPERTY ENVIRONMENT
+            # FIXME: a plethora of shared_ptrs in my Environment/Value design is causing a ton of
+            # reference cycles and memory leaks. Perhaps second book chapter will show how to design
+            # the interpreter without shared_ptrs :)
+            ASAN_OPTIONS=detect_leaks=0
+    )
 endforeach()

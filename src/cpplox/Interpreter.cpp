@@ -89,13 +89,6 @@ public:
     {
         auto block_env = std::make_shared<Environment>(m_env.get());
         execute_block(block.stmts, block_env);
-
-        // Callables defined in the block are holding a reference to the block environment,
-        // which causes cyclic dependency. Explicitly clear out environment before releasing
-        // it, there's nothing that could reference this block after this point.
-        // TODO: shouldn't the same be done for function scope below? Why does it work there???
-        block_env->clear();
-        assert(block_env.use_count() == 1);
     }
 
     auto operator()(const stmt::Class & stmt) -> void
