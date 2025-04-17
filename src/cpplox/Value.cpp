@@ -36,7 +36,7 @@ struct ValueTypes
     public:
         using func_type = std::function<
                 Value(const Token & /* caller */,
-                      Environment * /* closure */,
+                      std::shared_ptr<Environment> /* closure */,
                       std::span<const Value> /* args */)>;
 
         Callable(std::shared_ptr<Environment> closure, func_type func)
@@ -171,7 +171,7 @@ std::size_t ValueTypes::Object::s_id = 0;
 
 auto ValueTypes::Callable::call(const Token & caller, std::span<const Value> args) const -> Value
 {
-    return m_func(caller, m_closure.get(), args);
+    return m_func(caller, m_closure, args);
 }
 
 auto ValueTypes::Object::get(const Token & name) -> Value
@@ -212,7 +212,9 @@ template <typename Func, std::size_t... Is>
 auto make_runtime_caller(Func && f, std::index_sequence<Is...> /* ids */)
 {
     return [f = std::forward<Func>(f
-            )](const Token & caller, Environment * /* closure */, std::span<const Value> args) {
+            )](const Token & caller,
+               std::shared_ptr<Environment> /* closure */,
+               std::span<const Value> args) {
         if (args.size() != sizeof...(Is)) {
             throw RuntimeError(
                     caller.clone(),

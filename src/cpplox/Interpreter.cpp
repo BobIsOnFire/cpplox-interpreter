@@ -87,7 +87,7 @@ public:
 
     auto operator()(const stmt::Block & block) -> void
     {
-        auto block_env = std::make_shared<Environment>(m_env.get());
+        auto block_env = std::make_shared<Environment>(m_env);
         execute_block(block.stmts, block_env);
     }
 
@@ -110,7 +110,7 @@ public:
         std::unordered_map<std::string, ValueTypes::Callable> methods;
 
         {
-            auto class_env = std::make_shared<Environment>(m_env.get());
+            auto class_env = std::make_shared<Environment>(m_env);
             std::swap(m_env, class_env);
             ScopeExit exit{[&]() { std::swap(m_env, class_env); }};
 
@@ -379,7 +379,9 @@ private:
                 // "stmts" might already be destroyed when we actually get to calling it.
                 // Need to have statements globally available somehow to support REPL mode.
                 [this, &name, params, stmts, is_initializer](
-                        const Token & caller, Environment * closure, std::span<const Value> args
+                        const Token & caller,
+                        std::shared_ptr<Environment> closure,
+                        std::span<const Value> args
                 ) -> Value {
                     if (args.size() != params.size()) {
                         throw RuntimeError(

@@ -1,0 +1,9 @@
+var f1;
+{
+  var i = 1;
+  {
+    fun f() { print i; }
+    f1 = f;
+  }
+}
+f1(); // expect: 1

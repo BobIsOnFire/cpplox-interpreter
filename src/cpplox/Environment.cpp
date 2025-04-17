@@ -11,8 +11,8 @@ namespace cpplox {
 class Environment
 {
 public:
-    explicit Environment(Environment * enclosing = nullptr)
-        : m_enclosing(enclosing)
+    explicit Environment(std::shared_ptr<Environment> enclosing = nullptr)
+        : m_enclosing(std::move(enclosing))
     {
     }
 
@@ -46,7 +46,7 @@ public:
     {
         auto * env = this;
         for (std::size_t i = 0; i < distance; i++) {
-            env = env->m_enclosing;
+            env = env->m_enclosing.get();
         }
         return env;
     }
@@ -54,7 +54,7 @@ public:
     auto clear() -> void { m_values.clear(); }
 
 private:
-    Environment * m_enclosing = nullptr;
+    std::shared_ptr<Environment> m_enclosing = nullptr;
     std::unordered_map<std::string, Value> m_values;
 };
 
