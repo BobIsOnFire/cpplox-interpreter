@@ -1,0 +1,4 @@
+Foo.init(one)
+Foo.init(two)
+<Foo instance at 0x7b539e605690>
+init
