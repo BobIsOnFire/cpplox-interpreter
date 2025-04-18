@@ -43,7 +43,7 @@ public:
 
     auto runtime_error(const RuntimeError & error) -> void
     {
-        std::println(std::cerr, "{}\n[line {}]", error.what(), error.get_token().get_line());
+        std::println(std::cerr, "[line {}] {}", error.get_token().get_line(), error.what());
         m_has_runtime_errors = true;
     }
 
