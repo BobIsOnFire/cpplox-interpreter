@@ -1,2 +1,2 @@
-<callable #1>
-<callable #0>
+<fun #0 (foo)>
+<native fun (clock)>

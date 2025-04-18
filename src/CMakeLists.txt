@@ -56,7 +56,6 @@ target_sources(cpplox
     BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}
   PRIVATE
     cpplox/LoxImpl.cpp  
-    cpplox/ValueImpl.cpp
 )
 
 target_link_libraries(cpplox PRIVATE

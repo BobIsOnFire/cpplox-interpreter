@@ -107,7 +107,7 @@ public:
             );
         });
 
-        std::unordered_map<std::string, ValueTypes::Callable> methods;
+        std::unordered_map<std::string, ValueTypes::Function> methods;
 
         {
             auto class_env = std::make_shared<Environment>(m_env);
@@ -120,10 +120,7 @@ public:
 
             for (const auto & method : stmt.methods) {
                 bool is_initializer = method.name.get_lexeme() == "init";
-                methods.emplace(
-                        method.name.get_lexeme(),
-                        create_callable(method.name, method.params, method.stmts, is_initializer)
-                );
+                methods.emplace(method.name.get_lexeme(), create_function(method, is_initializer));
             }
         }
 
@@ -135,7 +132,7 @@ public:
 
     auto operator()(const stmt::Function & stmt) -> void
     {
-        m_env->define(stmt.name.get_lexeme(), create_callable(stmt.name, stmt.params, stmt.stmts));
+        m_env->define(stmt.name.get_lexeme(), create_function(stmt));
     }
 
     auto operator()(const stmt::If & stmt) -> void
@@ -278,9 +275,9 @@ public:
         );
 
         Token this_tok("this", expr.keyword.get_line(), TokenType::This);
-        auto this_obj = m_env->get_at(this_tok, distance - 1);
+        auto this_obj = m_env->get_at(this_tok, distance - 1).clone();
 
-        const auto * method = super.find_method(expr.method.get_lexeme());
+        const auto * method = lookup_method(super, expr.method.get_lexeme());
         if (method == nullptr) {
             throw RuntimeError(
                     expr.method.clone(),
@@ -288,7 +285,7 @@ public:
             );
         }
 
-        return method->bind(std::move(this_obj));
+        return bind_function(*method, std::move(this_obj));
     }
 
     auto operator()(const expr::This & expr) -> Value
@@ -318,7 +315,7 @@ public:
     {
         auto object = evaluate(*expr.object);
         auto visitor = overloads{
-                [&](ValueTypes::Object & obj) { return obj.get(expr.name); },
+                [&](ValueTypes::Object & obj) { return lookup_field(obj, expr.name); },
                 [&](auto &&) -> Value {
                     throw RuntimeError(expr.name.clone(), "Only objects have properties.");
                 },
@@ -333,7 +330,7 @@ public:
         auto visitor = overloads{
                 [&](ValueTypes::Object & obj) {
                     auto value = evaluate(*expr.value);
-                    obj.set(expr.name, value.clone());
+                    obj.get_fields().insert_or_assign(expr.name.get_lexeme(), value.clone());
                     return value;
                 },
                 [&](auto &&) -> Value {
@@ -366,65 +363,50 @@ private:
         return std::visit(visitor, val);
     }
 
-    auto create_callable(
-            const Token & name,
-            std::span<const Token> params,
-            std::span<const StmtPtr> stmts,
-            bool is_initializer = false
-    ) -> ValueTypes::Callable
+    auto invoke(ValueTypes::Function & func, std::span<const Value> args, const Token & caller)
+            -> Value
     {
-        return {
-                m_env,
-                // FIXME: In REPL mode, if function was defined in a different line input,
-                // "stmts" might already be destroyed when we actually get to calling it.
-                // Need to have statements globally available somehow to support REPL mode.
-                [this, &name, params, stmts, is_initializer](
-                        const Token & caller,
-                        std::shared_ptr<Environment> closure,
-                        std::span<const Value> args
-                ) -> Value {
-                    if (args.size() != params.size()) {
-                        throw RuntimeError(
-                                caller.clone(),
-                                std::format(
-                                        "Expected {} arguments but got {}.",
-                                        params.size(),
-                                        args.size()
-                                )
-                        );
-                    }
+        const auto & node = func.get_node();
+        check_arity(caller, node.params.size(), args.size());
 
-                    auto func_env = std::make_shared<Environment>(closure);
+        auto func_env = std::make_shared<Environment>(func.get_closure());
 
-                    for (std::size_t i = 0; i < params.size(); i++) {
-                        func_env->define(params[i].get_lexeme(), args[i].clone());
-                    }
+        for (std::size_t i = 0; i < node.params.size(); i++) {
+            func_env->define(node.params[i].get_lexeme(), args[i].clone());
+        }
 
-                    Value return_value = ValueTypes::Null{};
-                    try {
-                        execute_block(stmts, func_env);
-                    }
-                    catch (Return & ret) {
-                        return_value = std::move(ret).value();
-                    }
+        Value return_value = ValueTypes::Null{};
+        try {
+            execute_block(node.stmts, func_env);
+        }
+        catch (Return & ret) {
+            return_value = std::move(ret).value();
+        }
 
-                    if (is_initializer) {
-                        Token this_tok("this", name.get_line(), TokenType::This);
-                        return_value = func_env->get_at(this_tok, 0);
-                    }
+        if (func.is_initializer()) {
+            Token this_tok("this", node.name.get_line(), TokenType::This);
+            return_value = func_env->get_at(this_tok, 0).clone();
+        }
 
-                    return return_value;
-                },
-        };
+        return return_value;
     }
 
-    auto invoke_value(Value & value, std::span<const Value> args, const Token & token) -> Value
+    auto
+    invoke(ValueTypes::NativeFunction & func, std::span<const Value> args, const Token & caller)
+            -> Value
+    {
+        check_arity(caller, func.get_arity(), args.size());
+        return func.get_function()(args);
+    }
+
+    auto invoke_value(Value & value, std::span<const Value> args, const Token & caller) -> Value
     {
         auto visitor = overloads{
-                [&](ValueTypes::Callable & callable) { return callable.call(token, args); },
-                [&](ValueTypes::Class & cls) { return create_class_instance(cls, args, token); },
+                [&](ValueTypes::Function & func) { return invoke(func, args, caller); },
+                [&](ValueTypes::NativeFunction & func) { return invoke(func, args, caller); },
+                [&](ValueTypes::Class & cls) { return create_class_instance(cls, args, caller); },
                 [&](auto &&) -> Value {
-                    throw RuntimeError(token.clone(), "Can only call functions and classes.");
+                    throw RuntimeError(caller.clone(), "Can only call functions and classes.");
                 },
         };
 
@@ -440,9 +422,55 @@ private:
         return m_globals->get(name);
     }
 
+    auto lookup_field(const ValueTypes::Object & obj, const Token & name) -> Value
+    {
+        const auto & fields = obj.get_fields();
+        auto it = fields.find(name.get_lexeme());
+        if (it != fields.end()) {
+            return it->second.clone();
+        }
+
+        auto method = lookup_method(obj, name.get_lexeme());
+        if (method.has_value()) {
+            return std::move(method).value();
+        }
+
+        throw RuntimeError(
+                name.clone(), std::format("Undefined property '{}'.", name.get_lexeme())
+        );
+    }
+
+    // NOLINTNEXTLINE(misc-no-recursion)
+    auto lookup_method(const ValueTypes::Class & cls, const std::string & name)
+            -> const ValueTypes::Function *
+    {
+        const auto & methods = cls.get_methods();
+        auto it = methods.find(name);
+        if (it != methods.end()) {
+            return &it->second;
+        }
+
+        const auto & super = cls.get_super();
+        if (super.has_value()) {
+            return lookup_method(*super.value(), name);
+        }
+
+        return nullptr;
+    }
+
+    auto lookup_method(const ValueTypes::Object & obj, const std::string & name)
+            -> std::optional<ValueTypes::Function>
+    {
+        const auto * method = lookup_method(obj.get_class(), name);
+        if (method != nullptr) {
+            return bind_function(*method, obj);
+        }
+        return std::nullopt;
+    }
+
     auto init_globals() -> void
     {
-        m_globals->define("clock", make_native_callable(m_env, []() -> Value {
+        m_globals->define("clock", make_native_function("clock", []() -> Value {
                               using namespace std::chrono;
                               return static_cast<double>(
                                       duration_cast<seconds>(system_clock::now().time_since_epoch())
@@ -451,18 +479,44 @@ private:
                           }));
     }
 
+    auto create_function(const stmt::Function & node, bool is_initializer = false)
+            -> ValueTypes::Function
+    {
+        return {node, m_env, is_initializer};
+    }
+
     auto create_class_instance(
-            const ValueTypes::Class & cls, std::span<const Value> args, const Token & token
+            const ValueTypes::Class & cls, std::span<const Value> args, const Token & caller
     ) -> Value
     {
+        static constexpr std::string init = "init";
+
         auto obj = ValueTypes::Object(cls);
 
-        auto maybe_init = obj.get_method("init");
-        auto init = maybe_init.has_value()
-                ? maybe_init.value()
-                : create_callable(token, {}, {}, /* is_initializer */ true).bind(obj);
+        auto maybe_init = lookup_method(obj, init);
+        if (maybe_init.has_value()) {
+            return invoke(maybe_init.value(), args, caller);
+        }
 
-        return init.call(token, args);
+        check_arity(caller, 0, args.size());
+        return obj;
+    }
+
+    auto check_arity(const Token & caller, std::size_t arity, std::size_t args_len) -> void
+    {
+        if (args_len != arity) {
+            throw RuntimeError(
+                    caller.clone(),
+                    std::format("Expected {} arguments but got {}.", arity, args_len)
+            );
+        }
+    }
+
+    auto bind_function(const ValueTypes::Function & func, Value this_obj) -> ValueTypes::Function
+    {
+        auto this_closure = std::make_shared<Environment>(func.get_closure());
+        this_closure->define("this", std::move(this_obj));
+        return {func.get_node(), this_closure, func.is_initializer()};
     }
 
     std::unordered_map<const void *, std::size_t> m_locals;
