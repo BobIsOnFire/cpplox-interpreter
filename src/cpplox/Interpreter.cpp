@@ -30,6 +30,30 @@ concept alternative_of = requires(const Var & var) {
     (const std::variant<Args...> &) {}(var);
 };
 
+template <typename T, typename... Args>
+concept NativeCallable = requires(T && f, Args &&... args) {
+    { std::invoke(std::forward<T>(f), std::forward<Args>(args)...) } -> std::same_as<cpplox::Value>;
+};
+
+template <typename Func, std::size_t... Is>
+auto make_runtime_caller(Func && f, std::index_sequence<Is...> /* ids */)
+        -> cpplox::value::NativeFunction::func_type
+{
+    return [f = std::forward<Func>(f)](std::span<const cpplox::Value> args) {
+        return f(args[Is]...);
+    };
+}
+
+template <std::same_as<cpplox::Value>... Args, NativeCallable<Args...> Func>
+auto make_native_function(std::string_view name, Func && f) -> cpplox::value::NativeFunctionPtr
+{
+    return std::make_shared<cpplox::value::NativeFunction>(
+            name,
+            sizeof...(Args),
+            make_runtime_caller(std::forward<Func>(f), std::index_sequence_for<Args...>{})
+    );
+}
+
 } // namespace
 
 namespace cpplox {
@@ -96,8 +120,8 @@ public:
         auto super = stmt.super.transform([this](const expr::Variable & super) {
             return std::visit(
                     overloads{
-                            [](ValueTypes::Class cls) { return cls; },
-                            [&](auto &&) -> ValueTypes::Class {
+                            [](value::ClassPtr cls) { return cls; },
+                            [&](auto &&) -> value::ClassPtr {
                                 throw RuntimeError(
                                         super.name.clone(), "Superclass must be a class."
                                 );
@@ -107,7 +131,7 @@ public:
             );
         });
 
-        std::unordered_map<std::string, ValueTypes::Function> methods;
+        std::unordered_map<std::string, value::FunctionPtr> methods;
 
         {
             auto class_env = std::make_shared<Environment>(m_env);
@@ -126,7 +150,9 @@ public:
 
         m_env->define(
                 stmt.name.get_lexeme(),
-                ValueTypes::Class(stmt.name.get_lexeme(), std::move(super), std::move(methods))
+                std::make_shared<value::Class>(
+                        stmt.name.get_lexeme(), std::move(methods), std::move(super)
+                )
         );
     }
 
@@ -150,7 +176,7 @@ public:
     auto operator()(const stmt::Return & stmt) -> void
     {
         throw Return(stmt.value.transform([this](auto & v) { return evaluate(*v); }
-        ).value_or(ValueTypes::Null{}));
+        ).value_or(value::Null{}));
     }
 
     auto operator()(const stmt::While & stmt) -> void
@@ -167,7 +193,7 @@ public:
         m_env->define(
                 stmt.name.get_lexeme(),
                 stmt.init.transform([this](auto & v) { return evaluate(*v); }
-                ).value_or(ValueTypes::Null{})
+                ).value_or(value::Null{})
         );
     }
 
@@ -176,8 +202,8 @@ public:
     auto operator()(const expr::Literal & expr) -> Value
     {
         const auto visitor = overloads{
-                [](const Token::EmptyLiteral &) -> Value { return ValueTypes::Null{}; },
-                [](const Token::NullLiteral &) -> Value { return ValueTypes::Null{}; },
+                [](const Token::EmptyLiteral &) -> Value { return value::Null{}; },
+                [](const Token::NullLiteral &) -> Value { return value::Null{}; },
                 [](const auto & val) -> Value { return val; },
         };
 
@@ -266,8 +292,8 @@ public:
         std::size_t distance = m_locals.at(&expr);
         auto super = std::visit(
                 overloads{
-                        [](ValueTypes::Class & cls) { return cls; },
-                        [&](auto &&) -> ValueTypes::Class {
+                        [](value::ClassPtr & cls) { return cls; },
+                        [&](auto &&) -> value::ClassPtr {
                             throw RuntimeError(expr.keyword.clone(), "'super' is not a class.");
                         },
                 },
@@ -315,7 +341,7 @@ public:
     {
         auto object = evaluate(*expr.object);
         auto visitor = overloads{
-                [&](ValueTypes::Object & obj) { return lookup_field(obj, expr.name); },
+                [&](value::ObjectPtr & obj) { return lookup_field(obj, expr.name); },
                 [&](auto &&) -> Value {
                     throw RuntimeError(expr.name.clone(), "Only objects have properties.");
                 },
@@ -328,9 +354,9 @@ public:
     {
         auto object = evaluate(*expr.object);
         auto visitor = overloads{
-                [&](ValueTypes::Object & obj) {
+                [&](value::ObjectPtr & obj) {
                     auto value = evaluate(*expr.value);
-                    obj.get_fields().insert_or_assign(expr.name.get_lexeme(), value.clone());
+                    obj->fields.insert_or_assign(expr.name.get_lexeme(), value.clone());
                     return value;
                 },
                 [&](auto &&) -> Value {
@@ -355,27 +381,27 @@ private:
     auto is_truthy(const Value & val) -> bool
     {
         const auto visitor = overloads{
-                [](ValueTypes::Null) { return false; },
-                [](ValueTypes::Boolean val) { return val; },
+                [](value::Null) { return false; },
+                [](value::Boolean val) { return val; },
                 [](const auto &) { return true; },
         };
 
         return std::visit(visitor, val);
     }
 
-    auto invoke(ValueTypes::Function & func, std::span<const Value> args, const Token & caller)
+    auto invoke(value::FunctionPtr & func, std::span<const Value> args, const Token & caller)
             -> Value
     {
-        const auto & node = func.get_node();
+        const auto & node = *func->node;
         check_arity(caller, node.params.size(), args.size());
 
-        auto func_env = std::make_shared<Environment>(func.get_closure());
+        auto func_env = std::make_shared<Environment>(func->closure);
 
         for (std::size_t i = 0; i < node.params.size(); i++) {
             func_env->define(node.params[i].get_lexeme(), args[i].clone());
         }
 
-        Value return_value = ValueTypes::Null{};
+        Value return_value = value::Null{};
         try {
             execute_block(node.stmts, func_env);
         }
@@ -383,7 +409,7 @@ private:
             return_value = std::move(ret).value();
         }
 
-        if (func.is_initializer()) {
+        if (func->is_initializer) {
             Token this_tok("this", node.name.get_line(), TokenType::This);
             return_value = func_env->get_at(this_tok, 0).clone();
         }
@@ -392,19 +418,19 @@ private:
     }
 
     auto
-    invoke(ValueTypes::NativeFunction & func, std::span<const Value> args, const Token & caller)
+    invoke(value::NativeFunctionPtr & native, std::span<const Value> args, const Token & caller)
             -> Value
     {
-        check_arity(caller, func.get_arity(), args.size());
-        return func.get_function()(args);
+        check_arity(caller, native->arity, args.size());
+        return native->func(args);
     }
 
     auto invoke_value(Value & value, std::span<const Value> args, const Token & caller) -> Value
     {
         auto visitor = overloads{
-                [&](ValueTypes::Function & func) { return invoke(func, args, caller); },
-                [&](ValueTypes::NativeFunction & func) { return invoke(func, args, caller); },
-                [&](ValueTypes::Class & cls) { return create_class_instance(cls, args, caller); },
+                [&](value::FunctionPtr & func) { return invoke(func, args, caller); },
+                [&](value::NativeFunctionPtr & func) { return invoke(func, args, caller); },
+                [&](value::ClassPtr & cls) { return create_class_instance(cls, args, caller); },
                 [&](auto &&) -> Value {
                     throw RuntimeError(caller.clone(), "Can only call functions and classes.");
                 },
@@ -422,9 +448,9 @@ private:
         return m_globals->get(name);
     }
 
-    auto lookup_field(const ValueTypes::Object & obj, const Token & name) -> Value
+    auto lookup_field(const value::ObjectPtr & obj, const Token & name) -> Value
     {
-        const auto & fields = obj.get_fields();
+        const auto & fields = obj->fields;
         auto it = fields.find(name.get_lexeme());
         if (it != fields.end()) {
             return it->second.clone();
@@ -441,27 +467,27 @@ private:
     }
 
     // NOLINTNEXTLINE(misc-no-recursion)
-    auto lookup_method(const ValueTypes::Class & cls, const std::string & name)
-            -> const ValueTypes::Function *
+    auto lookup_method(const value::ClassPtr & cls, const std::string & name)
+            -> const value::FunctionPtr *
     {
-        const auto & methods = cls.get_methods();
+        const auto & methods = cls->methods;
         auto it = methods.find(name);
         if (it != methods.end()) {
             return &it->second;
         }
 
-        const auto & super = cls.get_super();
+        const auto & super = cls->super;
         if (super.has_value()) {
-            return lookup_method(*super.value(), name);
+            return lookup_method(super.value(), name);
         }
 
         return nullptr;
     }
 
-    auto lookup_method(const ValueTypes::Object & obj, const std::string & name)
-            -> std::optional<ValueTypes::Function>
+    auto lookup_method(const value::ObjectPtr & obj, const std::string & name)
+            -> std::optional<value::FunctionPtr>
     {
-        const auto * method = lookup_method(obj.get_class(), name);
+        const auto * method = lookup_method(obj->cls, name);
         if (method != nullptr) {
             return bind_function(*method, obj);
         }
@@ -480,18 +506,18 @@ private:
     }
 
     auto create_function(const stmt::Function & node, bool is_initializer = false)
-            -> ValueTypes::Function
+            -> value::FunctionPtr
     {
-        return {node, m_env, is_initializer};
+        return std::make_shared<value::Function>(&node, m_env, is_initializer);
     }
 
     auto create_class_instance(
-            const ValueTypes::Class & cls, std::span<const Value> args, const Token & caller
+            const value::ClassPtr & cls, std::span<const Value> args, const Token & caller
     ) -> Value
     {
         static constexpr std::string init = "init";
 
-        auto obj = ValueTypes::Object(cls);
+        auto obj = std::make_shared<value::Object>(cls);
 
         auto maybe_init = lookup_method(obj, init);
         if (maybe_init.has_value()) {
@@ -512,11 +538,11 @@ private:
         }
     }
 
-    auto bind_function(const ValueTypes::Function & func, Value this_obj) -> ValueTypes::Function
+    auto bind_function(const value::FunctionPtr & func, Value this_obj) -> value::FunctionPtr
     {
-        auto this_closure = std::make_shared<Environment>(func.get_closure());
+        auto this_closure = std::make_shared<Environment>(func->closure);
         this_closure->define("this", std::move(this_obj));
-        return {func.get_node(), this_closure, func.is_initializer()};
+        return std::make_shared<value::Function>(func->node, this_closure, func->is_initializer);
     }
 
     std::unordered_map<const void *, std::size_t> m_locals;

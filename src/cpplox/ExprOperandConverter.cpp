@@ -23,14 +23,14 @@ public:
     auto operator=(ExprOperandConverter const &) -> ExprOperandConverter & = delete;
     auto operator=(ExprOperandConverter &&) -> ExprOperandConverter & = delete;
 
-    auto as_number(Value & value) -> ValueTypes::Number &
+    auto as_number(Value & value) -> value::Number &
     {
-        return as<ValueTypes::Number>(value, "Operand must be number.");
+        return as<value::Number>(value, "Operand must be number.");
     }
 
-    auto as_string(Value & value) -> ValueTypes::String &
+    auto as_string(Value & value) -> value::String &
     {
-        return as<ValueTypes::String>(value, "Operand must be string.");
+        return as<value::String>(value, "Operand must be string.");
     }
 
     template <typename T> auto as(Value & value, std::string_view error_message) -> T &

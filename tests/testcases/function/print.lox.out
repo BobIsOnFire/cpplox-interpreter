@@ -1,2 +1,2 @@
-<fun #0 (foo)>
-<native fun (clock)>
+<fun foo>
+<native fun clock>

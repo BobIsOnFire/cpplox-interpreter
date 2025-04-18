@@ -51,6 +51,7 @@ target_sources(cpplox
       cpplox/Token.cpp
       cpplox/TokenType.cpp
       cpplox/Value.cpp
+      cpplox/ValueTypes.cpp
       cpplox/exits.cpp
       cpplox.cppm
     BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}

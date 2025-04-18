@@ -1,4 +1,4 @@
 Foo.init(one)
 Foo.init(two)
-<object #0 (Foo instance)>
+<class Foo instance>
 init
