@@ -16,6 +16,7 @@ foreach(file IN LISTS TEST_FILES)
     )
     set_property(TEST "${test_name}"
         PROPERTY ENVIRONMENT
+            UBSAN_OPTIONS=print_stacktrace=1
             # FIXME: a plethora of shared_ptrs in my Environment/Value design is causing a ton of
             # reference cycles and memory leaks. Perhaps second book chapter will show how to design
             # the interpreter without shared_ptrs :)

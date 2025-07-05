@@ -25,6 +25,7 @@ include(cmake/Sanitizers.cmake)
 add_subdirectory(thd-modules)
 
 add_subdirectory(src)
+add_subdirectory(cpplox2)
 
 enable_testing()
 add_subdirectory(tests)
