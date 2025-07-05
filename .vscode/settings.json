@@ -2,9 +2,9 @@
     "clangd.arguments": [
         // "--experimental-modules-support",
         "--header-insertion=never",
-        "--compile-commands-dir=build/sanitize_address"
+        "--compile-commands-dir=build/sanitize_undefined"
     ],
-    "cmake.cmakePath": "${userHome}/cmake-4.0.1/bin/cmake",
+    "cmake.cmakePath": "${userHome}/cmake-4.0.3/bin/cmake",
     "[cpp]": {
         "editor.formatOnSave": true
     },

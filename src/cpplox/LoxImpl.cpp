@@ -34,7 +34,7 @@ auto Lox::run(std::string source) -> ExitCode
     // }
 
     Resolver resolver;
-    resolver.resolve(statements);
+    resolver.resolve(std::span{statements});
 
     if (Diagnostics::instance()->has_errors()) {
         return ExitCode::SoftwareError;

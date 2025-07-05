@@ -37,7 +37,7 @@ public:
     auto operator()(const stmt::Block & block) -> void
     {
         begin_scope();
-        resolve(block.stmts);
+        resolve(std::span{block.stmts});
         end_scope();
     }
 
@@ -229,7 +229,7 @@ private:
     auto resolve_local(const alternative_of<Expr> auto & expr, const Token & name) -> void
     {
         auto scopes_enumerated = std::views::zip(std::views::iota(0UZ), m_scopes);
-        for (const auto & [i, scope] : scopes_enumerated | std::views::reverse) {
+        for (const auto & [i, scope] : std::ranges::reverse_view{scopes_enumerated}) {
             if (scope.contains(name.get_lexeme())) {
                 Interpreter::instance()->resolve(expr, m_scopes.size() - 1 - i);
                 return;
@@ -247,7 +247,7 @@ private:
             declare(param);
             define(param);
         }
-        resolve(function.stmts);
+        resolve(std::span{function.stmts});
         end_scope();
 
         m_current_function = enclosing;
