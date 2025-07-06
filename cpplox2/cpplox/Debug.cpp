@@ -23,14 +23,7 @@ auto constant(std::string_view name, const Chunk & chunk, std::size_t offset) ->
 
 auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> std::size_t
 {
-    std::print("{:04} ", offset);
-    auto sloc = chunk.locations[offset];
-    if (offset > 0 && sloc.line == chunk.locations[offset - 1].line) {
-        std::print("{:>4}:{:<4} ", '|', sloc.column);
-    }
-    else {
-        std::print("{:>4}:{:<4} ", sloc.line, sloc.column);
-    }
+    std::print("{:04} {:>4} ", offset, get_source_location(chunk, offset).line);
 
     auto instruction = static_cast<OpCode>(chunk.code[offset]);
     switch (instruction) {
