@@ -7,6 +7,7 @@ export module cpplox2:VirtualMachine;
 import std;
 
 import :Chunk;
+import :Compiler;
 import :Debug;
 import :Value;
 
@@ -113,11 +114,13 @@ auto run() -> InterpretResult
     }
 }
 
-export auto interpret(const Chunk & chunk) -> InterpretResult
+export auto interpret(std::string_view source) -> InterpretResult
 {
-    g_vm.chunk = &chunk;
-    g_vm.ip = chunk.code.data();
-    return run();
+    compile(source);
+    return InterpretResult::Ok;
+    // g_vm.chunk = &chunk;
+    // g_vm.ip = chunk.code.data();
+    // return run();
 }
 
 } // namespace cpplox

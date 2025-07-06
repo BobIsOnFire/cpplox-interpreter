@@ -4,10 +4,13 @@ target_sources(cpplox2
   PUBLIC
     FILE_SET cxx_modules TYPE CXX_MODULES FILES
       cpplox/Chunk.cpp
+      cpplox/Compiler.cpp
       cpplox/Debug.cpp
+      cpplox/Scanner.cpp
       cpplox/SourceLocation.cpp
       cpplox/Value.cpp
       cpplox/VirtualMachine.cpp
+      cpplox/exits.cpp
       cpplox.cppm
     BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}
 )

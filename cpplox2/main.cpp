@@ -1,32 +1,55 @@
 import std;
 import cpplox2;
 
-auto main() -> int
+namespace {
+
+auto repl() -> void
 {
-    cpplox::Chunk chunk;
+    for (std::string line; std::print("> "), std::getline(std::cin, line);) {
+        [[maybe_unused]] auto result = cpplox::interpret(line);
+    }
+    std::println("\nexit");
+}
 
-    // NOLINTBEGIN(readability-magic-numbers)
-    auto val = cpplox::add_constant(chunk, 1.2);
-    cpplox::write_chunk(chunk, cpplox::OpCode::Constant, {.line = 123, .column = 8});
-    cpplox::write_chunk(chunk, val, {.line = 123, .column = 8});
+auto run_file(const std::filesystem::path & filename) -> void
+{
+    std::ifstream script(filename);
+    if (!script.is_open()) {
+        std::println("Failed to open {}", filename.native());
+        cpplox::exit_program(cpplox::ExitCode::IOError);
+    }
 
-    auto val2 = cpplox::add_constant(chunk, 3.4);
-    cpplox::write_chunk(chunk, cpplox::OpCode::Constant, {.line = 123, .column = 14});
-    cpplox::write_chunk(chunk, val2, {.line = 123, .column = 14});
+    std::stringstream buffer;
+    buffer << script.rdbuf();
+    script.close();
 
-    cpplox::write_chunk(chunk, cpplox::OpCode::Add, {.line = 123, .column = 12});
+    auto result = cpplox::interpret(buffer.str());
 
-    auto val3 = cpplox::add_constant(chunk, 5.6);
-    cpplox::write_chunk(chunk, cpplox::OpCode::Constant, {.line = 123, .column = 20});
-    cpplox::write_chunk(chunk, val3, {.line = 123, .column = 20});
+    if (result == cpplox::InterpretResult::CompileError) {
+        cpplox::exit_program(cpplox::ExitCode::IncorrectInput);
+    }
+    if (result == cpplox::InterpretResult::RuntimeError) {
+        cpplox::exit_program(cpplox::ExitCode::SoftwareError);
+    }
+}
 
-    cpplox::write_chunk(chunk, cpplox::OpCode::Divide, {.line = 123, .column = 18});
+} // namespace
 
-    cpplox::write_chunk(chunk, cpplox::OpCode::Negate, {.line = 123, .column = 7});
+auto main(int argc, char ** argv) -> int
+{
+    auto args = std::span(argv, static_cast<std::size_t>(argc))
+            | std::views::drop(1) // drop argv[0], it's executable name
+            | std::views::transform([](char const * arg) { return std::string_view{arg}; })
+            | std::ranges::to<std::vector>();
 
-    cpplox::write_chunk(chunk, cpplox::OpCode::Return, {.line = 123, .column = 1});
-    // NOLINTEND(readability-magic-numbers)
-
-    // cpplox::disassemble_chunk(chunk, "test chunk");
-    [[maybe_unused]] auto result = cpplox::interpret(chunk);
+    if (args.size() == 0) {
+        repl();
+    }
+    else if (args.size() == 1) {
+        run_file(args[1]);
+    }
+    else {
+        std::println(std::cerr, "Usage: cpplox [path]");
+        cpplox::exit_program(cpplox::ExitCode::IncorrectUsage);
+    }
 }
