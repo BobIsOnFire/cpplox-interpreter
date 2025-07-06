@@ -7,6 +7,7 @@ target_sources(cpplox2
       cpplox/Debug.cpp
       cpplox/SourceLocation.cpp
       cpplox/Value.cpp
+      cpplox/VirtualMachine.cpp
       cpplox.cppm
     BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}
 )

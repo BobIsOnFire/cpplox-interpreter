@@ -15,6 +15,11 @@ export using Byte = std::uint8_t;
 
 export enum class OpCode : Byte {
     Constant,
+    Add,
+    Substract,
+    Multiply,
+    Divide,
+    Negate,
     Return,
 };
 
@@ -38,7 +43,7 @@ export auto write_chunk(Chunk & chunk, OpCode op, SourceLocation sloc) -> void
 
 export auto add_constant(Chunk & chunk, Value value) -> Byte
 {
-    assert(chunk.constants.size() < sizeof(Byte));
+    assert(chunk.constants.size() < std::numeric_limits<Byte>::max());
     chunk.constants.push_back(value);
     return static_cast<Byte>(chunk.constants.size() - 1);
 }

@@ -5,6 +5,7 @@ Checks: >
     -bugprone-exception-escape,
     cert-*,
     cppcoreguidelines-*,
+    -cppcoreguidelines-avoid-magic-numbers,
     hicpp-*,
     misc-*,
     -misc-use-internal-linkage,
