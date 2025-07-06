@@ -61,21 +61,37 @@ auto pop_value() -> Value
     return val;
 }
 
+auto top_value() -> Value &
+{
+    assert(g_vm.stack.size() > 0 && "Value stack empty");
+    return g_vm.stack.back();
+}
+
 template <OpCode op> auto binary_op() -> void
 {
+    using enum OpCode;
     Value rhs = pop_value();
-    Value lhs = pop_value();
-    if constexpr (op == OpCode::Add) {
-        push_value(lhs + rhs);
+    Value & lhs = top_value();
+    if constexpr (op == Add) {
+        lhs += rhs;
     }
-    if constexpr (op == OpCode::Substract) {
-        push_value(lhs - rhs);
+    if constexpr (op == Substract) {
+        lhs -= rhs;
     }
-    if constexpr (op == OpCode::Multiply) {
-        push_value(lhs * rhs);
+    if constexpr (op == Multiply) {
+        lhs *= rhs;
     }
-    if constexpr (op == OpCode::Divide) {
-        push_value(lhs / rhs);
+    if constexpr (op == Divide) {
+        lhs /= rhs;
+    }
+}
+
+template <OpCode op> auto unary_op() -> void
+{
+    using enum OpCode;
+    Value & top = top_value();
+    if constexpr (op == Negate) {
+        top = -top;
     }
 }
 
@@ -103,7 +119,7 @@ auto run() -> InterpretResult
         case Multiply: binary_op<Multiply>(); break;
         case Divide: binary_op<Divide>(); break;
         // Unary ops
-        case Negate: push_value(-pop_value()); break;
+        case Negate: unary_op<Negate>(); break;
         //
         case Return: {
             std::println("OUT: {}", pop_value());
