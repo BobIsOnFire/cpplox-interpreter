@@ -46,7 +46,7 @@ auto main(int argc, char ** argv) -> int
         repl();
     }
     else if (args.size() == 1) {
-        run_file(args[1]);
+        run_file(args[0]);
     }
     else {
         std::println(std::cerr, "Usage: cpplox [path]");
