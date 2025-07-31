@@ -25,6 +25,7 @@ export struct VirtualMachine
     std::vector<Value> stack;
 };
 
+// TODO: make this store error only, and use std::expected<std::monostate, InterpretError> for this
 export enum class [[nodiscard]] InterpretResult : std::uint8_t {
     Ok,
     CompileError,
@@ -116,11 +117,14 @@ auto run() -> InterpretResult
 
 export auto interpret(std::string_view source) -> InterpretResult
 {
-    compile(source);
-    return InterpretResult::Ok;
-    // g_vm.chunk = &chunk;
-    // g_vm.ip = chunk.code.data();
-    // return run();
+    auto chunk = compile(source);
+    if (!chunk.has_value()) {
+        return InterpretResult::CompileError;
+    }
+
+    g_vm.chunk = &*chunk;
+    g_vm.ip = chunk->code.data();
+    return run();
 }
 
 } // namespace cpplox

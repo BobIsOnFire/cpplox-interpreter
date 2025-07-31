@@ -129,7 +129,7 @@ auto skip_whitespace() -> void
         case '\t': advance(); break;
         case '/':
             if (peek_next() == '/') {
-                while (peek() != '\n' && !is_at_end()) {
+                while (!is_at_end() && peek() != '\n') {
                     advance();
                 }
             }
@@ -215,7 +215,7 @@ auto identifier_type() -> TokenType
 
 auto string() -> Token
 {
-    while (peek() != '"' && !is_at_end()) {
+    while (!is_at_end() && peek() != '"') {
         if (peek() == '\n') {
             g_scanner.sloc.line++;
             g_scanner.sloc.column = 0;
@@ -233,13 +233,13 @@ auto string() -> Token
 
 auto number() -> Token
 {
-    while (is_digit(peek())) {
+    while (!is_at_end() && is_digit(peek())) {
         advance();
     }
 
-    if (peek() == '.' && is_digit(peek_next())) {
+    if (!is_at_end() && peek() == '.' && is_digit(peek_next())) {
         advance(); // consume dot
-        while (is_digit(peek())) {
+        while (!is_at_end() && is_digit(peek())) {
             advance();
         }
     }
@@ -249,7 +249,7 @@ auto number() -> Token
 
 auto identifier() -> Token
 {
-    while (is_alpha(peek()) || is_digit(peek()) || peek() == '_') {
+    while (!is_at_end() && (is_alpha(peek()) || is_digit(peek()) || peek() == '_')) {
         advance();
     }
     return make_token(identifier_type());

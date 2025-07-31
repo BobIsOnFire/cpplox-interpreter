@@ -41,11 +41,10 @@ export auto write_chunk(Chunk & chunk, OpCode op, SourceLocation sloc) -> void
     write_chunk(chunk, static_cast<Byte>(op), sloc);
 }
 
-export auto add_constant(Chunk & chunk, Value value) -> Byte
+export auto add_constant(Chunk & chunk, Value value) -> std::size_t
 {
-    assert(chunk.constants.size() < std::numeric_limits<Byte>::max());
     chunk.constants.push_back(value);
-    return static_cast<Byte>(chunk.constants.size() - 1);
+    return chunk.constants.size() - 1;
 }
 
 } // namespace cpplox
