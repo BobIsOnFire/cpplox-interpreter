@@ -43,7 +43,12 @@ enum class Precedence : std::uint8_t
     Primary,
 };
 
-using ParseFn = void (*)();
+struct ParseContext
+{
+    bool can_assign;
+};
+
+using ParseFn = void (*)(ParseContext);
 
 struct ParseRule
 {
@@ -75,7 +80,7 @@ auto error_at(const Token & token, std::string_view message) -> void
         std::print(std::cerr, " at '{}'", token.lexeme);
     }
 
-    std::print(": {}", message);
+    std::println(": {}", message);
 
     g_parser.had_error = true;
 }
@@ -104,6 +109,43 @@ auto consume(TokenType type, std::string_view message) -> void
     }
 
     error_at_current(message);
+}
+
+auto check(TokenType type) -> bool { return g_parser.current.type == type; }
+
+auto match(TokenType type) -> bool
+{
+    if (!check(type)) {
+        return false;
+    }
+    advance();
+    return true;
+}
+
+auto synchronize() -> void
+{
+    using enum TokenType;
+
+    g_parser.panic_mode = false;
+    while (g_parser.current.type != EndOfFile) {
+        if (g_parser.previous.type == Semicolon) {
+            return;
+        }
+        switch (g_parser.current.type) {
+        case Class:
+        case Fun:
+        case Var:
+        case For:
+        case If:
+        case While:
+        case Print:
+        case Return: return;
+
+        default: // do nothing
+        }
+
+        advance();
+    }
 }
 
 // *** Byte Code Emitter ***
@@ -149,6 +191,19 @@ auto end_compiler() -> void
     }
 }
 
+auto identifier_constant(const Token & name) -> Byte
+{
+    return make_constant(Value::string(std::string{name.lexeme}));
+}
+
+auto parse_variable(std::string_view error_message) -> Byte
+{
+    consume(TokenType::Identifier, error_message);
+    return identifier_constant(g_parser.previous);
+}
+
+auto define_variable(Byte global) -> void { emit_bytes(OpCode::DefineGlobal, global); }
+
 // *** Expression Parser ***
 
 auto parse_precedence(Precedence precedence) -> void;
@@ -161,7 +216,7 @@ auto next_precedence(Precedence precedence) -> Precedence
 
 auto expression() -> void { parse_precedence(Precedence::Assignment); }
 
-auto number() -> void
+auto number(ParseContext /* ctx */) -> void
 {
     double value = 0;
 
@@ -173,13 +228,13 @@ auto number() -> void
     emit_constant(Value::number(value));
 }
 
-auto grouping() -> void
+auto grouping(ParseContext /* ctx */) -> void
 {
     expression();
     consume(TokenType::RightParenthesis, "Expect ')' after expression.");
 }
 
-auto unary() -> void
+auto unary(ParseContext /* ctx */) -> void
 {
     TokenType operator_type = g_parser.previous.type;
 
@@ -192,7 +247,7 @@ auto unary() -> void
     }
 }
 
-auto binary() -> void
+auto binary(ParseContext /* ctx */) -> void
 {
     TokenType operator_type = g_parser.previous.type;
     parse_precedence(next_precedence(get_rule(operator_type).precedence));
@@ -214,7 +269,7 @@ auto binary() -> void
     }
 }
 
-auto literal() -> void
+auto literal(ParseContext /* ctx */) -> void
 {
     switch (g_parser.previous.type) {
     case TokenType::False: emit_byte(OpCode::False); break;
@@ -224,10 +279,82 @@ auto literal() -> void
     }
 }
 
-auto string() -> void
+auto string(ParseContext /* ctx */) -> void
 {
     auto lexeme = g_parser.previous.lexeme;
     emit_constant(Value::string(std::string{lexeme.substr(1, lexeme.length() - 2)}));
+}
+
+auto named_variable(const Token & name, ParseContext ctx) -> void
+{
+    Byte arg = identifier_constant(name);
+
+    if (ctx.can_assign && match(TokenType::Equal)) {
+        expression();
+        emit_bytes(OpCode::SetGlobal, arg);
+    }
+    else {
+        emit_bytes(OpCode::GetGlobal, arg);
+    }
+}
+
+auto variable(ParseContext ctx) -> void { named_variable(g_parser.previous, ctx); }
+
+// *** Statement Parser ***
+
+auto statement() -> void;
+auto declaration() -> void;
+
+auto print_statement() -> void
+{
+    expression();
+    consume(TokenType::Semicolon, "Expect ';' after value.");
+    emit_byte(OpCode::Print);
+}
+
+auto expression_statement() -> void
+{
+    expression();
+    consume(TokenType::Semicolon, "Expect ';' after expression.");
+    emit_byte(OpCode::Pop);
+}
+
+auto statement() -> void
+{
+    if (match(TokenType::Print)) {
+        print_statement();
+    }
+    else {
+        expression_statement();
+    }
+}
+
+auto var_declaration() -> void
+{
+    Byte global = parse_variable("Expect variable name.");
+
+    if (match(TokenType::Equal)) {
+        expression();
+    }
+    else {
+        emit_byte(OpCode::Nil);
+    }
+    consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
+
+    define_variable(global);
+}
+
+auto declaration() -> void
+{
+    if (match(TokenType::Var)) {
+        var_declaration();
+    }
+    else {
+        statement();
+    }
+    if (g_parser.panic_mode) {
+        synchronize();
+    }
 }
 
 template <typename T> struct array_size;
@@ -251,6 +378,7 @@ consteval auto generate_rule_table()
     rules[to_idx(TokenType::False)]           = {.prefix = literal,  .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::Greater)]         = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
     rules[to_idx(TokenType::GreaterEqual)]    = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
+    rules[to_idx(TokenType::Identifier)]      = {.prefix = variable, .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::LeftParenthesis)] = {.prefix = grouping, .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::Less)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
     rules[to_idx(TokenType::LessEqual)]       = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
@@ -283,13 +411,18 @@ auto parse_precedence(Precedence precedence) -> void
         return;
     }
 
-    prefix_rule();
+    ParseContext ctx{.can_assign = precedence <= Precedence::Assignment};
+    prefix_rule(ctx);
 
     while (precedence <= get_rule(g_parser.current.type).precedence) {
         advance();
         auto infix_rule = get_rule(g_parser.previous.type).infix;
         assert(infix_rule != nullptr);
-        infix_rule();
+        infix_rule(ctx);
+    }
+
+    if (ctx.can_assign && match(TokenType::Equal)) {
+        error("Invalid assignment target.");
     }
 }
 
@@ -303,8 +436,11 @@ export auto compile(std::string_view source) -> std::optional<Chunk>
 
     init_scanner(source);
     advance();
-    expression();
-    consume(TokenType::EndOfFile, "Expect end of expression.");
+
+    while (!match(TokenType::EndOfFile)) {
+        declaration();
+    }
+
     end_compiler();
 
     if (g_parser.had_error) {

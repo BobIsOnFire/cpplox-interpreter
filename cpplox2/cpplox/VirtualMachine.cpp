@@ -13,6 +13,7 @@ export struct VirtualMachine
     const Byte * ip = nullptr;
     std::vector<Value> stack;
     std::vector<Obj *> objects;
+    std::unordered_map<std::string, Value> globals;
 };
 
 // TODO: make this store error only, and use std::expected<std::monostate, InterpretError> for this

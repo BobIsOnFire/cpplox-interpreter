@@ -15,7 +15,7 @@ namespace cpplox {
 
 namespace {
 constexpr const std::size_t STACK_MAX = 256;
-constexpr const bool DEBUG_VM_EXECUTION = true;
+constexpr const bool DEBUG_VM_EXECUTION = false;
 } // namespace
 
 namespace {
@@ -36,7 +36,7 @@ template <typename... Args> auto runtime_error(std::format_string<Args...> fmt, 
 {
     const auto & location = g_vm.chunk->locations[get_ip_offset()];
     std::print(std::cerr, "[{}:{}] error: ", location.line, location.column);
-    std::println(std::cerr, fmt, std::forward(args)...);
+    std::println(std::cerr, fmt, std::forward<Args>(args)...);
 
     g_vm.stack.clear();
 }
@@ -100,6 +100,8 @@ auto is_falsey(Value value) -> bool
     return value.is_nil() || (value.is_boolean() && !value.as_boolean());
 }
 
+auto get_constant() -> Value { return g_vm.chunk->constants[advance_ip()]; }
+
 } // namespace
 
 auto run() -> InterpretResult
@@ -117,13 +119,42 @@ auto run() -> InterpretResult
         switch (static_cast<OpCode>(advance_ip())) {
         // Values
         case Constant: {
-            Value constant = g_vm.chunk->constants[advance_ip()];
-            push_value(constant);
+            push_value(get_constant());
             break;
         }
         case Nil: push_value(Value::nil()); break;
         case True: push_value(Value::boolean(true)); break;
         case False: push_value(Value::boolean(false)); break;
+        // Value manipulators
+        case Pop: pop_value(); break;
+        case DefineGlobal: {
+            const std::string & name = get_constant().as_string();
+            // FIXME: is there a way to get rid of copy on key insert? Key will surely live as long
+            // as VM lives
+            g_vm.globals.emplace(name, peek_value());
+            pop_value();
+            break;
+        }
+        case GetGlobal: {
+            const std::string & name = get_constant().as_string();
+            auto it = g_vm.globals.find(name);
+            if (it == g_vm.globals.end()) {
+                runtime_error("Undefined variable '{}'", name);
+                return InterpretResult::RuntimeError;
+            }
+            push_value(it->second);
+            break;
+        }
+        case SetGlobal: {
+            const std::string & name = get_constant().as_string();
+            auto it = g_vm.globals.find(name);
+            if (it == g_vm.globals.end()) {
+                runtime_error("Undefined variable '{}'", name);
+                return InterpretResult::RuntimeError;
+            }
+            it->second = peek_value();
+            break;
+        }
         // Comparison ops
         case Equal: {
             Value rhs = pop_value();
@@ -164,8 +195,8 @@ auto run() -> InterpretResult
             push_value(Value::number(-pop_value().as_number()));
             break;
         // Aux
+        case Print: std::println("{}", pop_value()); break;
         case Return: {
-            std::println("OUT: {}", pop_value());
             return InterpretResult::Ok;
         }
         }

@@ -58,6 +58,11 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case Nil: return simple("OP_NIL", offset);
     case True: return simple("OP_TRUE", offset);
     case False: return simple("OP_FALSE", offset);
+    // Value manipulators
+    case Pop: return simple("OP_POP", offset);
+    case DefineGlobal: return constant("OP_DEFINE_GLOBAL", chunk, offset);
+    case GetGlobal: return constant("OP_GET_GLOBAL", chunk, offset);
+    case SetGlobal: return constant("OP_SET_GLOBAL", chunk, offset);
     // Comparison ops
     case Equal: return simple("OP_EQUAL", offset);
     case Less: return simple("OP_LESS", offset);
@@ -71,6 +76,7 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case Not: return simple("OP_NOT", offset);
     case Negate: return simple("OP_NEGATE", offset);
     // Aux
+    case Print: return simple("OP_PRINT", offset);
     case Return: return simple("OP_RETURN", offset);
     }
 

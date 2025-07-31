@@ -19,6 +19,11 @@ export enum class OpCode : Byte {
     Nil,
     True,
     False,
+    // Value manipulators
+    Pop,
+    DefineGlobal,
+    GetGlobal,
+    SetGlobal,
     // Comparison ops
     Equal,
     Greater,
@@ -32,6 +37,7 @@ export enum class OpCode : Byte {
     Not,
     Negate,
     // Aux
+    Print,
     Return,
 };
 
