@@ -23,7 +23,9 @@ export enum class OpCode : Byte {
     Pop,
     DefineGlobal,
     GetGlobal,
+    GetLocal,
     SetGlobal,
+    SetLocal,
     // Comparison ops
     Equal,
     Greater,

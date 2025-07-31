@@ -22,6 +22,13 @@ auto constant(std::string_view name, const Chunk & chunk, std::size_t offset) ->
     return offset + 2;
 }
 
+auto byte(std::string_view name, const Chunk & chunk, std::size_t offset) -> std::size_t
+{
+    Byte slot = chunk.code[offset + 1];
+    std::println("{:16} {:4}", name, slot);
+    return offset + 2;
+}
+
 } // namespace
 
 export auto print_stack(std::span<const Value> stack_view) -> void
@@ -62,7 +69,9 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case Pop: return simple("OP_POP", offset);
     case DefineGlobal: return constant("OP_DEFINE_GLOBAL", chunk, offset);
     case GetGlobal: return constant("OP_GET_GLOBAL", chunk, offset);
+    case GetLocal: return byte("OP_GET_LOCAL", chunk, offset);
     case SetGlobal: return constant("OP_SET_GLOBAL", chunk, offset);
+    case SetLocal: return byte("OP_SET_LOCAL", chunk, offset);
     // Comparison ops
     case Equal: return simple("OP_EQUAL", offset);
     case Less: return simple("OP_LESS", offset);

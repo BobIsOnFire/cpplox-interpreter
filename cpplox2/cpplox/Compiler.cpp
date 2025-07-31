@@ -57,10 +57,23 @@ struct ParseRule
     Precedence precedence = Precedence::None;
 };
 
+struct Local
+{
+    Token name;
+    int depth = 0;
+};
+
+struct Compiler
+{
+    std::vector<Local> locals;
+    int scope_depth;
+};
+
 namespace {
 
 // FIXME: get rid of singleton instance
-Parser g_parser; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+Parser g_parser;               // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+Compiler * g_current_compiler; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 // *** Token Parser ***
 
@@ -191,18 +204,96 @@ auto end_compiler() -> void
     }
 }
 
+auto is_scope_local() -> bool { return g_current_compiler->scope_depth > 0; }
+
+auto begin_scope() -> void { g_current_compiler->scope_depth++; }
+
+auto end_scope() -> void
+{
+    g_current_compiler->scope_depth--;
+
+    while (g_current_compiler->locals.size() > 0
+           && g_current_compiler->locals.back().depth > g_current_compiler->scope_depth) {
+        g_current_compiler->locals.pop_back();
+        emit_byte(OpCode::Pop);
+    }
+}
+
 auto identifier_constant(const Token & name) -> Byte
 {
     return make_constant(Value::string(std::string{name.lexeme}));
 }
 
+auto add_local(const Token & name) -> void
+{
+    if (g_current_compiler->locals.size() > std::numeric_limits<Byte>::max()) {
+        error("Too many local variables in function.");
+        return;
+    }
+
+    g_current_compiler->locals.emplace_back(name, -1);
+}
+
+auto resolve_local(Compiler * compiler, const Token & name) -> std::optional<std::size_t>
+{
+    // FIXME: UHH why `vector | views::enumerate | views::reverse` doesn't work??? libstdc++ wtf???
+    for (const auto & [idx, local] :
+         std::ranges::reverse_view{std::ranges::enumerate_view{compiler->locals}}) {
+        if (local.name.lexeme == name.lexeme) {
+            if (local.depth == -1) {
+                error("Can't read local variable in its own initializer.");
+            }
+            return idx;
+        }
+    }
+    return std::nullopt;
+}
+
+auto mark_initialized() -> void
+{
+    g_current_compiler->locals.back().depth = g_current_compiler->scope_depth;
+}
+
+auto declare_variable() -> void
+{
+    if (!is_scope_local()) {
+        return;
+    }
+
+    const Token & name = g_parser.previous;
+    for (const auto & local : std::ranges::reverse_view{g_current_compiler->locals}) {
+        if (local.depth != -1 && local.depth < g_current_compiler->scope_depth) {
+            break;
+        }
+
+        if (local.name.lexeme == name.lexeme) {
+            error("Already a variable with this name in this scope.");
+        }
+    }
+
+    add_local(g_parser.previous);
+}
+
 auto parse_variable(std::string_view error_message) -> Byte
 {
     consume(TokenType::Identifier, error_message);
+    declare_variable();
+
+    if (is_scope_local()) {
+        return 0;
+    }
+
     return identifier_constant(g_parser.previous);
 }
 
-auto define_variable(Byte global) -> void { emit_bytes(OpCode::DefineGlobal, global); }
+auto define_variable(Byte global) -> void
+{
+    if (is_scope_local()) {
+        mark_initialized();
+        return;
+    }
+    emit_bytes(OpCode::DefineGlobal, global);
+}
 
 // *** Expression Parser ***
 
@@ -287,14 +378,28 @@ auto string(ParseContext /* ctx */) -> void
 
 auto named_variable(const Token & name, ParseContext ctx) -> void
 {
-    Byte arg = identifier_constant(name);
+    OpCode get_op;
+    OpCode set_op;
+    Byte arg;
+
+    auto local_pos = resolve_local(g_current_compiler, name);
+    if (local_pos.has_value()) {
+        get_op = OpCode::GetLocal;
+        set_op = OpCode::SetLocal;
+        arg = static_cast<Byte>(local_pos.value());
+    }
+    else {
+        get_op = OpCode::GetGlobal;
+        set_op = OpCode::SetGlobal;
+        arg = identifier_constant(name);
+    }
 
     if (ctx.can_assign && match(TokenType::Equal)) {
         expression();
-        emit_bytes(OpCode::SetGlobal, arg);
+        emit_bytes(set_op, arg);
     }
     else {
-        emit_bytes(OpCode::GetGlobal, arg);
+        emit_bytes(get_op, arg);
     }
 }
 
@@ -302,6 +407,8 @@ auto variable(ParseContext ctx) -> void { named_variable(g_parser.previous, ctx)
 
 // *** Statement Parser ***
 
+// It's a recursive descent parser, duh!
+// NOLINTBEGIN(misc-no-recursion)
 auto statement() -> void;
 auto declaration() -> void;
 
@@ -319,10 +426,24 @@ auto expression_statement() -> void
     emit_byte(OpCode::Pop);
 }
 
+auto block() -> void
+{
+    while (!check(TokenType::RightBrace) && !check(TokenType::EndOfFile)) {
+        declaration();
+    }
+
+    consume(TokenType::RightBrace, "Expect '}' after block.");
+}
+
 auto statement() -> void
 {
     if (match(TokenType::Print)) {
         print_statement();
+    }
+    else if (match(TokenType::LeftBrace)) {
+        begin_scope();
+        block();
+        end_scope();
     }
     else {
         expression_statement();
@@ -356,6 +477,7 @@ auto declaration() -> void
         synchronize();
     }
 }
+// NOLINTEND(misc-no-recursion)
 
 template <typename T> struct array_size;
 
@@ -431,6 +553,9 @@ auto parse_precedence(Precedence precedence) -> void
 // TODO: should denote failure, replace with std::expected
 export auto compile(std::string_view source) -> std::optional<Chunk>
 {
+    Compiler compiler;
+    g_current_compiler = &compiler;
+
     Chunk chunk;
     g_compiling_chunk = &chunk;
 

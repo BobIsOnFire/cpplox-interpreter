@@ -145,6 +145,11 @@ auto run() -> InterpretResult
             push_value(it->second);
             break;
         }
+        case GetLocal: {
+            Byte slot = advance_ip();
+            push_value(g_vm.stack[slot]);
+            break;
+        }
         case SetGlobal: {
             const std::string & name = get_constant().as_string();
             auto it = g_vm.globals.find(name);
@@ -153,6 +158,11 @@ auto run() -> InterpretResult
                 return InterpretResult::RuntimeError;
             }
             it->second = peek_value();
+            break;
+        }
+        case SetLocal: {
+            Byte slot = advance_ip();
+            g_vm.stack[slot] = pop_value();
             break;
         }
         // Comparison ops
