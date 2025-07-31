@@ -49,6 +49,15 @@ auto get_ip_offset() -> std::size_t
     return static_cast<std::size_t>(std::distance(g_vm.chunk->code.data(), g_vm.ip));
 }
 
+template <typename... Args> auto runtime_error(std::format_string<Args...> fmt, Args &&... args)
+{
+    const auto & location = g_vm.chunk->locations[get_ip_offset()];
+    std::print(std::cerr, "[{}:{}] error: ", location.line, location.column);
+    std::println(std::cerr, fmt, std::forward(args)...);
+
+    g_vm.stack.clear();
+}
+
 auto push_value(Value value) -> void
 {
     assert(g_vm.stack.size() < STACK_MAX && "Value stack overflow");
@@ -63,22 +72,49 @@ auto pop_value() -> Value
     return val;
 }
 
-template <OpCode op> auto binary_op() -> void
+auto peek_value(std::size_t distance = 0) -> Value
 {
-    Value rhs = pop_value();
-    Value lhs = pop_value();
+    assert(g_vm.stack.size() > distance && "Cannot peek, stack is not big enough");
+    return g_vm.stack[g_vm.stack.size() - 1 - distance];
+}
+
+template <OpCode op> auto binary_op() -> InterpretResult
+{
+    if (!peek_value(0).is_number() || !peek_value(1).is_number()) {
+        runtime_error("Operands must be numbers.");
+        return InterpretResult::RuntimeError;
+    }
+
+    auto rhs = pop_value().as_number();
+    auto lhs = pop_value().as_number();
+
+    Value result = Value::nil();
+    if constexpr (op == OpCode::Greater) {
+        result = Value::boolean(lhs > rhs);
+    }
+    if constexpr (op == OpCode::Less) {
+        result = Value::boolean(lhs < rhs);
+    }
     if constexpr (op == OpCode::Add) {
-        push_value(lhs + rhs);
+        result = Value::number(lhs + rhs);
     }
     if constexpr (op == OpCode::Substract) {
-        push_value(lhs - rhs);
+        result = Value::number(lhs - rhs);
     }
     if constexpr (op == OpCode::Multiply) {
-        push_value(lhs * rhs);
+        result = Value::number(lhs * rhs);
     }
     if constexpr (op == OpCode::Divide) {
-        push_value(lhs / rhs);
+        result = Value::number(lhs / rhs);
     }
+
+    push_value(result);
+    return InterpretResult::Ok;
+}
+
+auto is_falsey(Value value) -> bool
+{
+    return value.is_nil() || (value.is_boolean() && !value.as_boolean());
 }
 
 } // namespace
@@ -88,29 +124,55 @@ auto run() -> InterpretResult
     using enum OpCode;
 
     for (;;) {
+        InterpretResult op_result = InterpretResult::Ok;
+
         if constexpr (DEBUG_VM_EXECUTION) {
             print_stack(g_vm.stack);
             disassemble_instruction(*g_vm.chunk, get_ip_offset());
         }
 
         switch (static_cast<OpCode>(advance_ip())) {
+        // Values
         case Constant: {
             Value constant = g_vm.chunk->constants[advance_ip()];
             push_value(constant);
             break;
         }
+        case Nil: push_value(Value::nil()); break;
+        case True: push_value(Value::boolean(true)); break;
+        case False: push_value(Value::boolean(false)); break;
+        // Comparison ops
+        case Equal: {
+            Value rhs = pop_value();
+            Value lhs = pop_value();
+            push_value(Value::boolean(lhs == rhs));
+            break;
+        }
+        case Greater: op_result = binary_op<Greater>(); break;
+        case Less: op_result = binary_op<Less>(); break;
         // Binary ops
-        case Add: binary_op<Add>(); break;
-        case Substract: binary_op<Substract>(); break;
-        case Multiply: binary_op<Multiply>(); break;
-        case Divide: binary_op<Divide>(); break;
+        case Add: op_result = binary_op<Add>(); break;
+        case Substract: op_result = binary_op<Substract>(); break;
+        case Multiply: op_result = binary_op<Multiply>(); break;
+        case Divide: op_result = binary_op<Divide>(); break;
         // Unary ops
-        case Negate: push_value(-pop_value()); break;
-        //
+        case Not: push_value(Value::boolean(is_falsey(pop_value()))); break;
+        case Negate:
+            if (!peek_value().is_number()) {
+                runtime_error("Operator must be a number.");
+                return InterpretResult::RuntimeError;
+            }
+            push_value(Value::number(-pop_value().as_number()));
+            break;
+        // Aux
         case Return: {
             std::println("OUT: {}", pop_value());
             return InterpretResult::Ok;
         }
+        }
+
+        if (op_result != InterpretResult::Ok) {
+            return op_result;
         }
     }
 }

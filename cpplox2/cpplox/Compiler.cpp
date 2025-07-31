@@ -169,7 +169,7 @@ auto number() -> void
     );
     assert((result.ec == std::errc{}) && "Cannot parse Number token provided by Scanner");
 
-    emit_constant(value);
+    emit_constant(Value::number(value));
 }
 
 auto grouping() -> void
@@ -185,6 +185,7 @@ auto unary() -> void
     parse_precedence(Precedence::Unary);
 
     switch (operator_type) {
+    case TokenType::Bang: emit_byte(OpCode::Not); break;
     case TokenType::Minus: emit_byte(OpCode::Negate); break;
     default: error("Unknown unary operand.");
     }
@@ -196,11 +197,29 @@ auto binary() -> void
     parse_precedence(next_precedence(get_rule(operator_type).precedence));
 
     switch (operator_type) {
+    case TokenType::BangEqual: emit_bytes(OpCode::Equal, OpCode::Not); break;
+    case TokenType::EqualEqual: emit_byte(OpCode::Equal); break;
+
+    case TokenType::Greater: emit_byte(OpCode::Greater); break;
+    case TokenType::GreaterEqual: emit_bytes(OpCode::Less, OpCode::Not); break;
+    case TokenType::Less: emit_byte(OpCode::Less); break;
+    case TokenType::LessEqual: emit_bytes(OpCode::Greater, OpCode::Not); break;
+
     case TokenType::Plus: emit_byte(OpCode::Add); break;
     case TokenType::Minus: emit_byte(OpCode::Substract); break;
     case TokenType::Star: emit_byte(OpCode::Multiply); break;
     case TokenType::Slash: emit_byte(OpCode::Divide); break;
     default: error("Unknown binary operand.");
+    }
+}
+
+auto literal() -> void
+{
+    switch (g_parser.previous.type) {
+    case TokenType::False: emit_byte(OpCode::False); break;
+    case TokenType::True: emit_byte(OpCode::True); break;
+    case TokenType::Nil: emit_byte(OpCode::Nil); break;
+    default: error("Unknown literal.");
     }
 }
 
@@ -219,12 +238,22 @@ consteval auto generate_rule_table()
 
     // clang-format off
     const auto to_idx = [](TokenType typ) { return static_cast<std::size_t>(typ); };
+    rules[to_idx(TokenType::Bang)]            = {.prefix = unary,    .infix = nullptr, .precedence = None};
+    rules[to_idx(TokenType::BangEqual)]       = {.prefix = nullptr,  .infix = binary,  .precedence = Equality};
+    rules[to_idx(TokenType::EqualEqual)]      = {.prefix = nullptr,  .infix = binary,  .precedence = Equality};
+    rules[to_idx(TokenType::False)]           = {.prefix = literal,  .infix = nullptr, .precedence = None};
+    rules[to_idx(TokenType::Greater)]         = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
+    rules[to_idx(TokenType::GreaterEqual)]    = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
     rules[to_idx(TokenType::LeftParenthesis)] = {.prefix = grouping, .infix = nullptr, .precedence = None};
+    rules[to_idx(TokenType::Less)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
+    rules[to_idx(TokenType::LessEqual)]       = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
     rules[to_idx(TokenType::Minus)]           = {.prefix = unary,    .infix = binary,  .precedence = Term};
+    rules[to_idx(TokenType::Nil)]             = {.prefix = literal,  .infix = nullptr, .precedence = None};
+    rules[to_idx(TokenType::Number)]          = {.prefix = number,   .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::Plus)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Term};
     rules[to_idx(TokenType::Slash)]           = {.prefix = nullptr,  .infix = binary,  .precedence = Factor};
     rules[to_idx(TokenType::Star)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Factor};
-    rules[to_idx(TokenType::Number)]          = {.prefix = number,   .infix = nullptr, .precedence = None};
+    rules[to_idx(TokenType::True)]            = {.prefix = literal,  .infix = nullptr, .precedence = None};
     // clang-format on
 
     return rules;

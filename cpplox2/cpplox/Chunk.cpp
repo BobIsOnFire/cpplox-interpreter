@@ -14,12 +14,24 @@ namespace cpplox {
 export using Byte = std::uint8_t;
 
 export enum class OpCode : Byte {
+    // Values
     Constant,
+    Nil,
+    True,
+    False,
+    // Comparison ops
+    Equal,
+    Greater,
+    Less,
+    // Binary ops
     Add,
     Substract,
     Multiply,
     Divide,
+    // Unary ops
+    Not,
     Negate,
+    // Aux
     Return,
 };
 

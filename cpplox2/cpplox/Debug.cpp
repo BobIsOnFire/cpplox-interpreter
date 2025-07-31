@@ -52,12 +52,24 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     auto instruction = static_cast<OpCode>(chunk.code[offset]);
 
     switch (instruction) {
+    // Values
     case Constant: return constant("OP_CONSTANT", chunk, offset);
+    case Nil: return simple("OP_NIL", offset);
+    case True: return simple("OP_TRUE", offset);
+    case False: return simple("OP_FALSE", offset);
+    // Comparison ops
+    case Equal: return simple("OP_EQUAL", offset);
+    case Less: return simple("OP_LESS", offset);
+    case Greater: return simple("OP_GREATER", offset);
+    // Binary ops
     case Add: return simple("OP_ADD", offset);
     case Substract: return simple("OP_SUBSTRACT", offset);
     case Multiply: return simple("OP_MULTIPLY", offset);
     case Divide: return simple("OP_DIVIDE", offset);
+    // Unary ops
+    case Not: return simple("OP_NOT", offset);
     case Negate: return simple("OP_NEGATE", offset);
+    // Aux
     case Return: return simple("OP_RETURN", offset);
     }
 
