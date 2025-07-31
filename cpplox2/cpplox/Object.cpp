@@ -1,6 +1,7 @@
 export module cpplox2:Object;
 
 import :Value;
+import :VirtualMachine;
 
 import std;
 
@@ -26,6 +27,8 @@ private:
     ObjType m_type;
 };
 
+// TODO: Can we do a flexible array member for this to avoid double indirection?
+// See: ch. 19 challenges, https://en.wikipedia.org/wiki/Flexible_array_member
 export class ObjString
     : public Obj
     , public std::string
@@ -51,7 +54,8 @@ template <ObjType type> auto value_is_obj_type(Value value) -> bool
 // completely separate module
 constexpr auto Value::string(std::string data) -> Value
 {
-    Obj * obj = new ObjString(std::move(data)); // FIXME: uh-oh, leak!
+    Obj * obj = new ObjString(std::move(data));
+    g_vm.objects.push_back(obj);
     return {ValueType::Obj, {.obj = obj}};
 }
 

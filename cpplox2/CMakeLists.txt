@@ -13,6 +13,7 @@ target_sources(cpplox2
       cpplox/Value.cpp
       cpplox/ValueFormatter.cpp
       cpplox/VirtualMachine.cpp
+      cpplox/VirtualMachineImpl.cpp
       cpplox/exits.cpp
       cpplox.cppm
     BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}

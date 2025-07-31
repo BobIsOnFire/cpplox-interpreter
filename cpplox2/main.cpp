@@ -5,10 +5,12 @@ namespace {
 
 auto repl() -> void
 {
+    cpplox::init_vm();
     for (std::string line; std::print("> "), std::getline(std::cin, line);) {
         [[maybe_unused]] auto result = cpplox::interpret(line);
     }
     std::println("\nexit");
+    cpplox::free_vm();
 }
 
 auto run_file(const std::filesystem::path & filename) -> void
@@ -23,7 +25,9 @@ auto run_file(const std::filesystem::path & filename) -> void
     buffer << script.rdbuf();
     script.close();
 
+    cpplox::init_vm();
     auto result = cpplox::interpret(buffer.str());
+    cpplox::free_vm();
 
     if (result == cpplox::InterpretResult::CompileError) {
         cpplox::exit_program(cpplox::ExitCode::IncorrectInput);
