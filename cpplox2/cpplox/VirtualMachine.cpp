@@ -151,7 +151,23 @@ auto run() -> InterpretResult
         case Greater: op_result = binary_op<Greater>(); break;
         case Less: op_result = binary_op<Less>(); break;
         // Binary ops
-        case Add: op_result = binary_op<Add>(); break;
+        case Add: {
+            if (peek_value(0).is_string() && peek_value(1).is_string()) {
+                std::string rhs = pop_value().as_string();
+                std::string lhs = pop_value().as_string();
+                push_value(Value::string(lhs + rhs));
+            }
+            else if (peek_value(0).is_number() && peek_value(1).is_number()) {
+                double rhs = pop_value().as_number();
+                double lhs = pop_value().as_number();
+                push_value(Value::number(lhs + rhs));
+            }
+            else {
+                runtime_error("Operands must be two numbers or two strings.");
+                return InterpretResult::RuntimeError;
+            }
+            break;
+        }
         case Substract: op_result = binary_op<Substract>(); break;
         case Multiply: op_result = binary_op<Multiply>(); break;
         case Divide: op_result = binary_op<Divide>(); break;

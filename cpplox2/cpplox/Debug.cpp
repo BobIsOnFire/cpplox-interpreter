@@ -3,6 +3,7 @@ export module cpplox2:Debug;
 import std;
 
 import :Chunk;
+import :ValueFormatter;
 
 namespace cpplox {
 

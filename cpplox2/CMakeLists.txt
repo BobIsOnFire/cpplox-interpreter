@@ -6,9 +6,12 @@ target_sources(cpplox2
       cpplox/Chunk.cpp
       cpplox/Compiler.cpp
       cpplox/Debug.cpp
+      cpplox/EnumFormatter.cpp
+      cpplox/Object.cpp
       cpplox/Scanner.cpp
       cpplox/SourceLocation.cpp
       cpplox/Value.cpp
+      cpplox/ValueFormatter.cpp
       cpplox/VirtualMachine.cpp
       cpplox/exits.cpp
       cpplox.cppm

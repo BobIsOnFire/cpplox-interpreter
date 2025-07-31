@@ -8,6 +8,7 @@ import std;
 
 import :Chunk;
 import :Debug;
+import :Object;
 import :Scanner;
 
 import magic_enum;
@@ -223,6 +224,12 @@ auto literal() -> void
     }
 }
 
+auto string() -> void
+{
+    auto lexeme = g_parser.previous.lexeme;
+    emit_constant(Value::string(std::string{lexeme.substr(1, lexeme.length() - 2)}));
+}
+
 template <typename T> struct array_size;
 
 template <typename T, std::size_t N> struct array_size<const std::array<T, N>>
@@ -253,6 +260,7 @@ consteval auto generate_rule_table()
     rules[to_idx(TokenType::Plus)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Term};
     rules[to_idx(TokenType::Slash)]           = {.prefix = nullptr,  .infix = binary,  .precedence = Factor};
     rules[to_idx(TokenType::Star)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Factor};
+    rules[to_idx(TokenType::String)]          = {.prefix = string,   .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::True)]            = {.prefix = literal,  .infix = nullptr, .precedence = None};
     // clang-format on
 

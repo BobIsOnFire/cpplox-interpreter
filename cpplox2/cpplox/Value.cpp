@@ -6,10 +6,14 @@ import magic_enum;
 
 namespace cpplox {
 
+export class Obj;
+export class ObjString;
+
 export enum class ValueType : std::uint8_t {
     Boolean,
     Nil,
     Number,
+    Obj,
 };
 
 // TODO: replace with std::variant?
@@ -20,6 +24,7 @@ private:
     {
         bool boolean;
         double number;
+        Obj * obj;
     };
 
     Value(ValueType type, ValueData as)
@@ -45,12 +50,22 @@ public:
         return {ValueType::Number, {.number = value}};
     }
 
+    // Do we need Obj/ObjString stuff in public members? Can we hide everything
+    // behind our Obj * field?
+    static constexpr auto obj(Obj * obj) -> Value { return {ValueType::Obj, {.obj = obj}}; }
+
+    static constexpr auto string(std::string data) -> Value;
+
     // Casts
 
     // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
     [[nodiscard]] constexpr auto as_boolean() const -> bool { return m_as.boolean; }
     [[nodiscard]] constexpr auto as_number() const -> double { return m_as.number; }
+    [[nodiscard]] constexpr auto as_obj() const -> Obj * { return m_as.obj; }
     // NOLINTEND(cppcoreguidelines-pro-type-union-access)
+
+    [[nodiscard]] constexpr auto as_objstring() const -> ObjString *;
+    [[nodiscard]] constexpr auto as_string() const -> std::string &;
 
     // Queries
 
@@ -59,19 +74,11 @@ public:
     [[nodiscard]] constexpr auto is_boolean() const -> bool { return is(ValueType::Boolean); }
     [[nodiscard]] constexpr auto is_nil() const -> bool { return is(ValueType::Nil); }
     [[nodiscard]] constexpr auto is_number() const -> bool { return is(ValueType::Number); }
+    [[nodiscard]] constexpr auto is_obj() const -> bool { return is(ValueType::Obj); }
 
-    auto operator==(const Value & other) const -> bool
-    {
-        if (m_type != other.m_type) {
-            return false;
-        }
+    [[nodiscard]] constexpr auto is_string() const -> bool;
 
-        switch (m_type) {
-        case ValueType::Boolean: return as_boolean() == other.as_boolean();
-        case ValueType::Nil: return true;
-        case ValueType::Number: return as_number() == other.as_number();
-        }
-    }
+    auto operator==(const Value & other) const -> bool;
 
 private:
     ValueType m_type;
@@ -79,23 +86,3 @@ private:
 };
 
 } // namespace cpplox
-
-template <> struct std::formatter<cpplox::ValueType> : std::formatter<std::string_view>
-{
-    auto format(const cpplox::ValueType & type, std::format_context & ctx) const
-    {
-        return std::formatter<std::string_view>::format(magic_enum::enum_name(type), ctx);
-    }
-};
-
-template <> struct std::formatter<cpplox::Value> : std::formatter<std::string_view>
-{
-    auto format(const cpplox::Value & value, std::format_context & ctx) const
-    {
-        switch (value.get_type()) {
-        case cpplox::ValueType::Boolean: return std::format_to(ctx.out(), "{}", value.as_boolean());
-        case cpplox::ValueType::Nil: return std::format_to(ctx.out(), "nil");
-        case cpplox::ValueType::Number: return std::format_to(ctx.out(), "{}", value.as_number());
-        }
-    }
-};
