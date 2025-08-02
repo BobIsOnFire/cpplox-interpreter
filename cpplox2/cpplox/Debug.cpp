@@ -29,6 +29,25 @@ auto byte(std::string_view name, const Chunk & chunk, std::size_t offset) -> std
     return offset + 2;
 }
 
+auto jump(std::string_view name, bool forward, const Chunk & chunk, std::size_t offset)
+        -> std::size_t
+{
+    DoubleByte jump_length = static_cast<DoubleByte>(chunk.code[offset + 1] << BYTE_DIGITS)
+            | chunk.code[offset + 2];
+
+    std::size_t jump_to = offset + 3;
+    if (forward) {
+        jump_to += jump_length;
+    }
+    else {
+        jump_to -= jump_length;
+    }
+
+    std::println("{:16} {:4} -> {}", name, offset, jump_to);
+
+    return offset + 3;
+}
+
 } // namespace
 
 export auto print_stack(std::span<const Value> stack_view) -> void
@@ -86,6 +105,9 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case Negate: return simple("OP_NEGATE", offset);
     // Aux
     case Print: return simple("OP_PRINT", offset);
+    case Jump: return jump("OP_JUMP", /* forward = */ true, chunk, offset);
+    case JumpIfFalse: return jump("OP_JUMP_IF_FALSE", /* forward = */ true, chunk, offset);
+    case Loop: return jump("OP_LOOP", /* forward = */ false, chunk, offset);
     case Return: return simple("OP_RETURN", offset);
     }
 

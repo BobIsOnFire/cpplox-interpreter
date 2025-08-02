@@ -23,9 +23,9 @@ struct Parser
 {
     Token current;
     Token previous;
-    bool had_error;
+    bool had_error = false;
     // TODO: prevents cascading errors, see error_at. Is there a better way to achieve this?
-    bool panic_mode;
+    bool panic_mode = false;
 };
 
 enum class Precedence : std::uint8_t
@@ -66,7 +66,7 @@ struct Local
 struct Compiler
 {
     std::vector<Local> locals;
-    int scope_depth;
+    int scope_depth = 0;
 };
 
 namespace {
@@ -179,10 +179,42 @@ template <typename ByteT, typename... Bytes> auto emit_bytes(ByteT byte, Bytes..
     }
 }
 
+auto emit_loop(std::size_t start) -> void
+{
+    emit_byte(OpCode::Loop);
+
+    std::size_t offset = current_chunk().code.size() - start + 2;
+    if (offset > DOUBLE_BYTE_MAX) {
+        error("Loop body too large.");
+    }
+
+    emit_byte(static_cast<Byte>((offset >> BYTE_DIGITS) & BYTE_MAX));
+    emit_byte(static_cast<Byte>(offset & BYTE_MAX));
+}
+
+auto emit_jump(OpCode instruction) -> std::size_t
+{
+    emit_bytes(instruction, BYTE_MAX, BYTE_MAX);
+
+    return current_chunk().code.size() - 2;
+}
+
+auto patch_jump(std::size_t offset) -> void
+{
+    std::size_t jump_length = current_chunk().code.size() - offset - 2;
+
+    if (jump_length > DOUBLE_BYTE_MAX) {
+        error("Too much code to jump over.");
+    }
+
+    current_chunk().code[offset] = (jump_length >> BYTE_DIGITS) & BYTE_MAX;
+    current_chunk().code[offset + 1] = jump_length & BYTE_MAX;
+}
+
 auto make_constant(Value value) -> Byte
 {
     std::size_t c = add_constant(current_chunk(), value);
-    if (c >= std::numeric_limits<Byte>::max()) {
+    if (c >= BYTE_MAX) {
         error("Too many constants in one chunk.");
         return 0;
     }
@@ -226,7 +258,7 @@ auto identifier_constant(const Token & name) -> Byte
 
 auto add_local(const Token & name) -> void
 {
-    if (g_current_compiler->locals.size() > std::numeric_limits<Byte>::max()) {
+    if (g_current_compiler->locals.size() > BYTE_MAX) {
         error("Too many local variables in function.");
         return;
     }
@@ -376,11 +408,33 @@ auto string(ParseContext /* ctx */) -> void
     emit_constant(Value::string(std::string{lexeme.substr(1, lexeme.length() - 2)}));
 }
 
+auto and_ex(ParseContext /* ctx */) -> void
+{
+    std::size_t end_jump = emit_jump(OpCode::JumpIfFalse);
+
+    emit_byte(OpCode::Pop);
+    parse_precedence(Precedence::And);
+
+    patch_jump(end_jump);
+}
+
+auto or_ex(ParseContext /* ctx */) -> void
+{
+    std::size_t else_jump = emit_jump(OpCode::JumpIfFalse);
+    std::size_t end_jump = emit_jump(OpCode::Jump);
+
+    patch_jump(else_jump);
+    emit_byte(OpCode::Pop);
+
+    parse_precedence(Precedence::Or);
+    patch_jump(end_jump);
+}
+
 auto named_variable(const Token & name, ParseContext ctx) -> void
 {
-    OpCode get_op;
-    OpCode set_op;
-    Byte arg;
+    OpCode get_op = OpCode::GetGlobal;
+    OpCode set_op = OpCode::SetGlobal;
+    Byte arg = 0;
 
     auto local_pos = resolve_local(g_current_compiler, name);
     if (local_pos.has_value()) {
@@ -412,6 +466,21 @@ auto variable(ParseContext ctx) -> void { named_variable(g_parser.previous, ctx)
 auto statement() -> void;
 auto declaration() -> void;
 
+auto var_declaration() -> void
+{
+    Byte global = parse_variable("Expect variable name.");
+
+    if (match(TokenType::Equal)) {
+        expression();
+    }
+    else {
+        emit_byte(OpCode::Nil);
+    }
+    consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
+
+    define_variable(global);
+}
+
 auto print_statement() -> void
 {
     expression();
@@ -435,10 +504,113 @@ auto block() -> void
     consume(TokenType::RightBrace, "Expect '}' after block.");
 }
 
+auto if_statement() -> void
+{
+    consume(TokenType::LeftParenthesis, "Expect '(' after 'if'.");
+    expression();
+    consume(TokenType::RightParenthesis, "Expect ')' after condition.");
+
+    std::size_t then_jump = emit_jump(OpCode::JumpIfFalse);
+    emit_byte(OpCode::Pop);
+
+    statement();
+
+    std::size_t else_jump = emit_jump(OpCode::Jump);
+
+    patch_jump(then_jump);
+    emit_byte(OpCode::Pop);
+
+    if (match(TokenType::Else)) {
+        statement();
+    }
+
+    patch_jump(else_jump);
+}
+
+auto while_statement() -> void
+{
+    std::size_t loop_start = current_chunk().code.size();
+
+    consume(TokenType::LeftParenthesis, "Expect '(' after 'while'.");
+    expression();
+    consume(TokenType::RightParenthesis, "Expect ')' after condition.");
+
+    std::size_t exit_jump = emit_jump(OpCode::JumpIfFalse);
+    emit_byte(OpCode::Pop);
+    statement();
+    emit_loop(loop_start);
+
+    patch_jump(exit_jump);
+    emit_byte(OpCode::Pop);
+}
+
+auto for_statement() -> void
+{
+    // Completely atrocious -- so many weird jumps! TODO - should revisit AST creation and
+    // double-pass approach.
+
+    begin_scope();
+
+    consume(TokenType::LeftParenthesis, "Expect '(' after 'for'.");
+    if (match(TokenType::Semicolon)) {
+        // No initializer
+    }
+    else if (match(TokenType::Var)) {
+        var_declaration();
+    }
+    else {
+        expression_statement();
+    }
+
+    std::size_t loop_start = current_chunk().code.size();
+
+    std::optional<std::size_t> exit_jump;
+    if (!match(TokenType::Semicolon)) {
+        expression();
+        consume(TokenType::Semicolon, "Expect ';' after loop condition.");
+
+        exit_jump = emit_jump(OpCode::JumpIfFalse);
+        emit_byte(OpCode::Pop);
+    }
+
+    if (!match(TokenType::RightParenthesis)) {
+        std::size_t body_jump = emit_jump(OpCode::Jump);
+        std::size_t increment_start = current_chunk().code.size();
+
+        expression();
+
+        emit_byte(OpCode::Pop);
+        consume(TokenType::RightParenthesis, "Expect ')' after for clauses.");
+
+        emit_loop(loop_start);
+        loop_start = increment_start;
+        patch_jump(body_jump);
+    }
+
+    statement();
+    emit_loop(loop_start);
+
+    if (exit_jump.has_value()) {
+        patch_jump(exit_jump.value());
+        emit_byte(OpCode::Pop);
+    }
+
+    end_scope();
+}
+
 auto statement() -> void
 {
     if (match(TokenType::Print)) {
         print_statement();
+    }
+    else if (match(TokenType::If)) {
+        if_statement();
+    }
+    else if (match(TokenType::While)) {
+        while_statement();
+    }
+    else if (match(TokenType::For)) {
+        for_statement();
     }
     else if (match(TokenType::LeftBrace)) {
         begin_scope();
@@ -448,21 +620,6 @@ auto statement() -> void
     else {
         expression_statement();
     }
-}
-
-auto var_declaration() -> void
-{
-    Byte global = parse_variable("Expect variable name.");
-
-    if (match(TokenType::Equal)) {
-        expression();
-    }
-    else {
-        emit_byte(OpCode::Nil);
-    }
-    consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
-
-    define_variable(global);
 }
 
 auto declaration() -> void
@@ -487,13 +644,14 @@ template <typename T, std::size_t N> struct array_size<const std::array<T, N>>
 };
 
 // oh my god holy shit
-consteval auto generate_rule_table()
+consteval auto generate_rule_table() noexcept
 {
     using enum Precedence;
     std::array<ParseRule, magic_enum::enum_values<TokenType>().size()> rules;
 
     // clang-format off
     const auto to_idx = [](TokenType typ) { return static_cast<std::size_t>(typ); };
+    rules[to_idx(TokenType::And)]             = {.prefix = nullptr,  .infix = and_ex,  .precedence = And};
     rules[to_idx(TokenType::Bang)]            = {.prefix = unary,    .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::BangEqual)]       = {.prefix = nullptr,  .infix = binary,  .precedence = Equality};
     rules[to_idx(TokenType::EqualEqual)]      = {.prefix = nullptr,  .infix = binary,  .precedence = Equality};
@@ -507,6 +665,7 @@ consteval auto generate_rule_table()
     rules[to_idx(TokenType::Minus)]           = {.prefix = unary,    .infix = binary,  .precedence = Term};
     rules[to_idx(TokenType::Nil)]             = {.prefix = literal,  .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::Number)]          = {.prefix = number,   .infix = nullptr, .precedence = None};
+    rules[to_idx(TokenType::Or)]              = {.prefix = nullptr,  .infix = or_ex,   .precedence = Or};
     rules[to_idx(TokenType::Plus)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Term};
     rules[to_idx(TokenType::Slash)]           = {.prefix = nullptr,  .infix = binary,  .precedence = Factor};
     rules[to_idx(TokenType::Star)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Factor};
@@ -521,6 +680,8 @@ constinit const auto g_rule_table = generate_rule_table();
 
 auto get_rule(TokenType type) -> const ParseRule &
 {
+    // Accessing a table via TokenType is safe, it has elements precisely for each TokenType value
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
     return g_rule_table[static_cast<std::size_t>(type)];
 }
 

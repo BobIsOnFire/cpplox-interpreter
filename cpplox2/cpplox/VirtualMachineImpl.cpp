@@ -20,11 +20,18 @@ constexpr const bool DEBUG_VM_EXECUTION = false;
 
 namespace {
 
-auto advance_ip() -> Byte
+auto read_byte() -> Byte
 {
     Byte b = *g_vm.ip;
     std::advance(g_vm.ip, 1);
     return b;
+}
+
+auto read_instruction() -> OpCode { return static_cast<OpCode>(read_byte()); }
+
+auto read_double_byte() -> DoubleByte
+{
+    return static_cast<DoubleByte>(read_byte() << BYTE_DIGITS) | read_byte();
 }
 
 auto get_ip_offset() -> std::size_t
@@ -100,7 +107,7 @@ auto is_falsey(Value value) -> bool
     return value.is_nil() || (value.is_boolean() && !value.as_boolean());
 }
 
-auto get_constant() -> Value { return g_vm.chunk->constants[advance_ip()]; }
+auto get_constant() -> Value { return g_vm.chunk->constants[read_byte()]; }
 
 } // namespace
 
@@ -116,7 +123,7 @@ auto run() -> InterpretResult
             disassemble_instruction(*g_vm.chunk, get_ip_offset());
         }
 
-        switch (static_cast<OpCode>(advance_ip())) {
+        switch (read_instruction()) {
         // Values
         case Constant: {
             push_value(get_constant());
@@ -146,7 +153,7 @@ auto run() -> InterpretResult
             break;
         }
         case GetLocal: {
-            Byte slot = advance_ip();
+            Byte slot = read_byte();
             push_value(g_vm.stack[slot]);
             break;
         }
@@ -161,7 +168,7 @@ auto run() -> InterpretResult
             break;
         }
         case SetLocal: {
-            Byte slot = advance_ip();
+            Byte slot = read_byte();
             g_vm.stack[slot] = pop_value();
             break;
         }
@@ -206,6 +213,23 @@ auto run() -> InterpretResult
             break;
         // Aux
         case Print: std::println("{}", pop_value()); break;
+        case Jump: {
+            DoubleByte offset = read_double_byte();
+            std::advance(g_vm.ip, offset);
+            break;
+        }
+        case JumpIfFalse: {
+            DoubleByte offset = read_double_byte();
+            if (is_falsey(peek_value())) {
+                std::advance(g_vm.ip, offset);
+            }
+            break;
+        }
+        case Loop: {
+            DoubleByte offset = read_double_byte();
+            std::advance(g_vm.ip, -static_cast<std::ptrdiff_t>(offset));
+            break;
+        }
         case Return: {
             return InterpretResult::Ok;
         }

@@ -12,6 +12,13 @@ import :Value;
 namespace cpplox {
 
 export using Byte = std::uint8_t;
+export using DoubleByte = std::uint16_t;
+
+static_assert(sizeof(Byte) * 2 == sizeof(DoubleByte));
+
+constexpr const unsigned int BYTE_DIGITS = std::numeric_limits<Byte>::digits;
+constexpr const Byte BYTE_MAX = std::numeric_limits<Byte>::max();
+constexpr const DoubleByte DOUBLE_BYTE_MAX = std::numeric_limits<DoubleByte>::max();
 
 export enum class OpCode : Byte {
     // Values
@@ -40,6 +47,9 @@ export enum class OpCode : Byte {
     Negate,
     // Aux
     Print,
+    Jump,
+    JumpIfFalse,
+    Loop,
     Return,
 };
 
