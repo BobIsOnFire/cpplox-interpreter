@@ -6,6 +6,7 @@ Checks: >
     cert-*,
     cppcoreguidelines-*,
     -cppcoreguidelines-avoid-magic-numbers,
+    -cppcoreguidelines-avoid-do-while,
     hicpp-*,
     misc-*,
     -misc-use-internal-linkage,

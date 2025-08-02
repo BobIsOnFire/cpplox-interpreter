@@ -108,6 +108,7 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case Jump: return jump("OP_JUMP", /* forward = */ true, chunk, offset);
     case JumpIfFalse: return jump("OP_JUMP_IF_FALSE", /* forward = */ true, chunk, offset);
     case Loop: return jump("OP_LOOP", /* forward = */ false, chunk, offset);
+    case Call: return byte("OP_CALL", chunk, offset);
     case Return: return simple("OP_RETURN", offset);
     }
 

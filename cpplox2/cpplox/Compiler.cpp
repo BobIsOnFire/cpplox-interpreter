@@ -16,8 +16,9 @@ import magic_enum;
 namespace cpplox {
 
 namespace {
+constexpr const std::size_t MAX_ARITY = 255;
 constexpr const bool DEBUG_PRINT_CODE = true;
-}
+} // namespace
 
 struct Parser
 {
@@ -63,8 +64,18 @@ struct Local
     int depth = 0;
 };
 
+enum class FunctionType : std::uint8_t
+{
+    Function,
+    Script,
+};
+
 struct Compiler
 {
+    Compiler * enclosing = nullptr;
+    ObjFunction * function = nullptr;
+    FunctionType type = FunctionType::Script;
+
     std::vector<Local> locals;
     int scope_depth = 0;
 };
@@ -72,8 +83,9 @@ struct Compiler
 namespace {
 
 // FIXME: get rid of singleton instance
-Parser g_parser;               // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
-Compiler * g_current_compiler; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+Parser g_parser; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+Compiler * g_current_compiler = nullptr;
 
 // *** Token Parser ***
 
@@ -163,10 +175,7 @@ auto synchronize() -> void
 
 // *** Byte Code Emitter ***
 
-// FIXME: get rid of singleton instance
-Chunk * g_compiling_chunk; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
-
-auto current_chunk() -> Chunk & { return *g_compiling_chunk; }
+auto current_chunk() -> Chunk & { return g_current_compiler->function->get_chunk(); }
 
 auto emit_byte(Byte byte) -> void { write_chunk(current_chunk(), byte, g_parser.previous.sloc); }
 auto emit_byte(OpCode op) -> void { write_chunk(current_chunk(), op, g_parser.previous.sloc); }
@@ -224,16 +233,38 @@ auto make_constant(Value value) -> Byte
 
 auto emit_constant(Value value) -> void { emit_bytes(OpCode::Constant, make_constant(value)); }
 
-auto emit_return() -> void { emit_byte(OpCode::Return); }
+auto emit_return() -> void
+{
+    emit_byte(OpCode::Nil);
+    emit_byte(OpCode::Return);
+}
 
-auto end_compiler() -> void
+auto init_compiler(Compiler & compiler, FunctionType type) -> void
+{
+    compiler.enclosing = g_current_compiler;
+    compiler.function = ObjFunction::create(
+            std::string{type == FunctionType::Script ? "" : g_parser.previous.lexeme}
+    );
+    compiler.type = type;
+    compiler.locals.push_back(
+            {.name = {.type = TokenType::EndOfFile, .lexeme = "", .sloc = {}}, .depth = 0}
+    );
+
+    g_current_compiler = &compiler;
+}
+
+auto end_compiler() -> ObjFunction *
 {
     emit_return();
+    auto * function = g_current_compiler->function;
     if constexpr (DEBUG_PRINT_CODE) {
         if (!g_parser.had_error) {
-            disassemble_chunk(current_chunk(), "code");
+            auto name = function->get_name();
+            disassemble_chunk(current_chunk(), name.empty() ? "<script>" : name);
         }
     }
+    g_current_compiler = g_current_compiler->enclosing;
+    return function;
 }
 
 auto is_scope_local() -> bool { return g_current_compiler->scope_depth > 0; }
@@ -283,6 +314,9 @@ auto resolve_local(Compiler * compiler, const Token & name) -> std::optional<std
 
 auto mark_initialized() -> void
 {
+    if (g_current_compiler->scope_depth == 0) {
+        return;
+    }
     g_current_compiler->locals.back().depth = g_current_compiler->scope_depth;
 }
 
@@ -459,6 +493,28 @@ auto named_variable(const Token & name, ParseContext ctx) -> void
 
 auto variable(ParseContext ctx) -> void { named_variable(g_parser.previous, ctx); }
 
+auto argument_list() -> Byte
+{
+    Byte arg_count = 0;
+    if (!check(TokenType::RightParenthesis)) {
+        do {
+            expression();
+            arg_count++;
+            if (arg_count > BYTE_MAX) {
+                error("Cannot have more than 255 arguments.");
+            }
+        } while (match(TokenType::Comma));
+    }
+    consume(TokenType::RightParenthesis, "Expect ')' after arguments.");
+    return arg_count;
+}
+
+auto call(ParseContext /* ctx */) -> void
+{
+    Byte arg_count = argument_list();
+    emit_bytes(OpCode::Call, arg_count);
+}
+
 // *** Statement Parser ***
 
 // It's a recursive descent parser, duh!
@@ -488,6 +544,22 @@ auto print_statement() -> void
     emit_byte(OpCode::Print);
 }
 
+auto return_statement() -> void
+{
+    if (g_current_compiler->type == FunctionType::Script) {
+        error("Can't return from top-level code.");
+    }
+
+    if (match(TokenType::Semicolon)) {
+        emit_byte(OpCode::Nil);
+    }
+    else {
+        expression();
+        consume(TokenType::Semicolon, "Expect ';' after return value.");
+    }
+    emit_byte(OpCode::Return);
+}
+
 auto expression_statement() -> void
 {
     expression();
@@ -502,6 +574,42 @@ auto block() -> void
     }
 
     consume(TokenType::RightBrace, "Expect '}' after block.");
+}
+
+auto function(FunctionType type) -> void
+{
+    Compiler compiler;
+    init_compiler(compiler, type);
+
+    begin_scope();
+
+    consume(TokenType::LeftParenthesis, "Expect '(' after function name.");
+    if (!check(TokenType::RightParenthesis)) {
+        do {
+            g_current_compiler->function->get_arity()++;
+            if (g_current_compiler->function->get_arity() > MAX_ARITY) {
+                error_at_current("Can't have more than 255 parameters.");
+            }
+            Byte constant = parse_variable("Expect parameter name.");
+            define_variable(constant);
+        } while (match(TokenType::Comma));
+    }
+    consume(TokenType::RightParenthesis, "Expect ')' after parameters.");
+    consume(TokenType::LeftBrace, "Expect '{' before function body.");
+    block();
+
+    auto * function = end_compiler();
+    emit_bytes(OpCode::Constant, make_constant(Value::obj(function)));
+}
+
+auto fun_declaration() -> void
+{
+    Byte global = parse_variable("Expect function name.");
+    mark_initialized();
+
+    function(FunctionType::Function);
+
+    define_variable(global);
 }
 
 auto if_statement() -> void
@@ -606,6 +714,9 @@ auto statement() -> void
     else if (match(TokenType::If)) {
         if_statement();
     }
+    else if (match(TokenType::Return)) {
+        return_statement();
+    }
     else if (match(TokenType::While)) {
         while_statement();
     }
@@ -624,7 +735,10 @@ auto statement() -> void
 
 auto declaration() -> void
 {
-    if (match(TokenType::Var)) {
+    if (match(TokenType::Fun)) {
+        fun_declaration();
+    }
+    else if (match(TokenType::Var)) {
         var_declaration();
     }
     else {
@@ -659,7 +773,7 @@ consteval auto generate_rule_table() noexcept
     rules[to_idx(TokenType::Greater)]         = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
     rules[to_idx(TokenType::GreaterEqual)]    = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
     rules[to_idx(TokenType::Identifier)]      = {.prefix = variable, .infix = nullptr, .precedence = None};
-    rules[to_idx(TokenType::LeftParenthesis)] = {.prefix = grouping, .infix = nullptr, .precedence = None};
+    rules[to_idx(TokenType::LeftParenthesis)] = {.prefix = grouping, .infix = call,    .precedence = Call};
     rules[to_idx(TokenType::Less)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
     rules[to_idx(TokenType::LessEqual)]       = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};
     rules[to_idx(TokenType::Minus)]           = {.prefix = unary,    .infix = binary,  .precedence = Term};
@@ -712,13 +826,10 @@ auto parse_precedence(Precedence precedence) -> void
 } // namespace
 
 // TODO: should denote failure, replace with std::expected
-export auto compile(std::string_view source) -> std::optional<Chunk>
+export auto compile(std::string_view source) -> ObjFunction *
 {
     Compiler compiler;
-    g_current_compiler = &compiler;
-
-    Chunk chunk;
-    g_compiling_chunk = &chunk;
+    init_compiler(compiler, FunctionType::Script);
 
     init_scanner(source);
     advance();
@@ -727,12 +838,8 @@ export auto compile(std::string_view source) -> std::optional<Chunk>
         declaration();
     }
 
-    end_compiler();
-
-    if (g_parser.had_error) {
-        return std::nullopt;
-    }
-    return chunk;
+    auto * function = end_compiler();
+    return g_parser.had_error ? nullptr : function;
 }
 
 } // namespace cpplox

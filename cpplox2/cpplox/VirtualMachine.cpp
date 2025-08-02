@@ -7,10 +7,16 @@ import :Value;
 
 namespace cpplox {
 
+export struct CallFrame
+{
+    ObjFunction * function;
+    const Byte * ip;
+    Value * slots; // TODO: std::span? or store offset?
+};
+
 export struct VirtualMachine
 {
-    const Chunk * chunk = nullptr;
-    const Byte * ip = nullptr;
+    std::vector<CallFrame> frames;
     std::vector<Value> stack;
     std::vector<Obj *> objects;
     std::unordered_map<std::string, Value> globals;
