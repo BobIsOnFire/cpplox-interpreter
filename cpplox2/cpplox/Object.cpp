@@ -1,10 +1,14 @@
 export module cpplox2:Object;
 
+import :Compiler;
 import :Chunk;
+import :EnumFormatter;
 import :Value;
 import :VirtualMachine;
 
 import std;
+
+import magic_enum;
 
 namespace cpplox {
 
@@ -28,9 +32,64 @@ public:
 
     [[nodiscard]] constexpr auto get_type() const -> ObjType { return m_type; }
 
+    // TODO: Should probably be virtual instead of having out-of-line mark_object()
+    constexpr auto mark() -> void { m_marked = true; }
+    constexpr auto clear_mark() -> void { m_marked = false; }
+    [[nodiscard]] constexpr auto is_marked() const -> bool { return m_marked; }
+
 private:
     ObjType m_type;
+    bool m_marked = false;
 };
+
+namespace {
+constexpr const bool DEBUG_RUN_GC_EVERY_TIME = false;
+constexpr const bool DEBUG_LOG_GC = true;
+constexpr const std::size_t GC_HEAP_GROW_FACTOR = 2;
+
+auto object_size(ObjType type) -> std::size_t;
+auto collect_garbage() -> void;
+
+} // namespace
+
+export template <std::derived_from<Obj> T, typename... Args>
+auto make_object(Args &&... args) -> T *
+{
+    if constexpr (DEBUG_RUN_GC_EVERY_TIME) {
+        collect_garbage();
+    }
+
+    if (g_vm.bytes_allocated >= g_vm.next_gc) {
+        collect_garbage();
+    }
+
+    T * obj = new T(std::forward<Args>(args)...); // NOLINT(cppcoreguidelines-owning-memory)
+
+    if constexpr (DEBUG_LOG_GC) {
+        std::println(
+                "Created {} at {}", magic_enum::enum_name(obj->get_type()), static_cast<void *>(obj)
+        );
+    }
+
+    g_vm.objects.push_back(obj);
+
+    g_vm.bytes_allocated += sizeof(T);
+
+    return obj;
+}
+
+export auto release_object(Obj * obj) -> void
+{
+    auto type = obj->get_type();
+
+    delete obj; // NOLINT(cppcoreguidelines-owning-memory)
+
+    g_vm.bytes_allocated -= object_size(type);
+
+    if constexpr (DEBUG_LOG_GC) {
+        std::println("Released {} at {}", magic_enum::enum_name(type), static_cast<void *>(obj));
+    }
+}
 
 export class ObjString : public Obj
 {
@@ -43,8 +102,7 @@ public:
 
     constexpr static auto create(std::string data) -> ObjString *
     {
-        auto * obj = new ObjString(std::move(data));
-        g_vm.objects.push_back(obj);
+        auto * obj = make_object<ObjString>(std::move(data));
         return obj;
     }
 
@@ -68,8 +126,7 @@ public:
 
     constexpr static auto create(Value * location) -> ObjUpvalue *
     {
-        auto * obj = new ObjUpvalue(location);
-        g_vm.objects.push_back(obj);
+        auto * obj = make_object<ObjUpvalue>(location);
         return obj;
     }
 
@@ -110,8 +167,7 @@ public:
 
     constexpr static auto create(std::string name) -> ObjFunction *
     {
-        auto * obj = new ObjFunction(std::move(name));
-        g_vm.objects.push_back(obj);
+        auto * obj = make_object<ObjFunction>(std::move(name));
         return obj;
     }
 
@@ -156,8 +212,7 @@ public:
 
     constexpr static auto create(Value::NativeFn callable) -> ObjNative *
     {
-        auto * obj = new ObjNative(callable);
-        g_vm.objects.push_back(obj);
+        auto * obj = make_object<ObjNative>(callable);
         return obj;
     }
 
@@ -178,8 +233,7 @@ public:
 
     constexpr static auto create(ObjFunction * function) -> ObjClosure *
     {
-        auto * obj = new ObjClosure(function);
-        g_vm.objects.push_back(obj);
+        auto * obj = make_object<ObjClosure>(function);
         return obj;
     }
 
@@ -300,3 +354,202 @@ auto Value::operator==(const Value & other) const -> bool
 }
 
 } // namespace cpplox
+
+template <> struct std::formatter<cpplox::ValueType> : cpplox::EnumFormatter<cpplox::ValueType>
+{
+};
+
+template <> struct std::formatter<cpplox::ObjType> : cpplox::EnumFormatter<cpplox::ObjType>
+{
+};
+
+template <> struct std::formatter<cpplox::Value> : std::formatter<std::string_view>
+{
+    auto format(const cpplox::Value & value, std::format_context & ctx) const
+    {
+        switch (value.get_type()) {
+        case cpplox::ValueType::Boolean: return std::format_to(ctx.out(), "{}", value.as_boolean());
+        case cpplox::ValueType::Nil: return std::format_to(ctx.out(), "nil");
+        case cpplox::ValueType::Number: return std::format_to(ctx.out(), "{}", value.as_number());
+        case cpplox::ValueType::Obj:
+            switch (value.as_obj()->get_type()) {
+            case cpplox::ObjType::String:
+                return std::formatter<std::string_view>::format(value.as_string(), ctx);
+            case cpplox::ObjType::Upvalue: return std::format_to(ctx.out(), "upvalue");
+            case cpplox::ObjType::Function: {
+                auto name = value.as_objfunction()->get_name();
+                if (name.empty()) {
+                    return std::format_to(ctx.out(), "<script>");
+                }
+                return std::format_to(ctx.out(), "<fn {}>", name);
+            }
+            case cpplox::ObjType::Closure: {
+                auto name = value.as_objclosure()->get_function()->get_name();
+                if (name.empty()) {
+                    return std::format_to(ctx.out(), "<script>");
+                }
+                return std::format_to(ctx.out(), "<fn {}>", name);
+            }
+            case cpplox::ObjType::Native: return std::format_to(ctx.out(), "<native fn>");
+            }
+        }
+    }
+};
+
+namespace cpplox { namespace {
+
+auto object_size(ObjType type) -> std::size_t
+{
+    switch (type) {
+    case ObjType::Closure: return sizeof(ObjClosure);
+    case ObjType::Function: return sizeof(ObjFunction);
+    case ObjType::Native: return sizeof(ObjNative);
+    case ObjType::String: return sizeof(ObjString);
+    case ObjType::Upvalue: return sizeof(ObjUpvalue);
+    }
+}
+
+auto mark_object(Obj * obj) -> void
+{
+    if (obj == nullptr) {
+        return;
+    }
+    if (obj->is_marked()) {
+        return;
+    }
+    if constexpr (DEBUG_LOG_GC) {
+        std::println(
+                "Mark {} at {} ({})",
+                magic_enum::enum_name(obj->get_type()),
+                static_cast<void *>(obj),
+                Value::obj(obj)
+        );
+    }
+    obj->mark();
+    g_vm.gray_objects.insert(obj);
+}
+
+auto mark_value(const Value & value) -> void
+{
+    if (value.is_obj()) {
+        mark_object(value.as_obj());
+    }
+}
+
+auto blacken_object(Obj * obj) -> void
+{
+    if constexpr (DEBUG_LOG_GC) {
+        std::println(
+                "Blacken {} at {} ({})",
+                magic_enum::enum_name(obj->get_type()),
+                static_cast<void *>(obj),
+                Value::obj(obj)
+        );
+    }
+
+    // TODO: definitely should be a virtual method in Obj classes
+    switch (obj->get_type()) {
+    case ObjType::Closure: {
+        auto * closure = dynamic_cast<ObjClosure *>(obj);
+        mark_object(closure->get_function());
+        for (const auto & value : closure->upvalues()) {
+            mark_object(value);
+        }
+        break;
+    }
+    case ObjType::Function: {
+        auto * function = dynamic_cast<ObjFunction *>(obj);
+        for (const auto & value : function->get_chunk().constants) {
+            mark_value(value);
+        }
+        break;
+    }
+    case ObjType::Native:
+    case ObjType::String: break;
+    case ObjType::Upvalue: mark_value(*dynamic_cast<ObjUpvalue *>(obj)->location()); break;
+    }
+}
+
+auto mark_compiler_roots() -> void
+{
+    Compiler * compiler = g_current_compiler;
+    while (compiler != nullptr) {
+        mark_object(compiler->function);
+        compiler = compiler->enclosing;
+    }
+}
+
+auto mark_roots() -> void
+{
+    for (const auto & value : g_vm.stack) {
+        mark_value(value);
+    }
+
+    for (const auto & frame : g_vm.frames) {
+        mark_object(frame.closure);
+    }
+
+    for (ObjUpvalue * upvalue = g_vm.open_upvalues; upvalue != nullptr; upvalue = upvalue->next()) {
+        mark_object(upvalue);
+    }
+
+    for (const auto & [_, value] : g_vm.globals) {
+        mark_value(value);
+    }
+
+    mark_compiler_roots();
+}
+
+auto trace_references() -> void
+{
+    while (!g_vm.gray_objects.empty()) {
+        auto it = g_vm.gray_objects.begin();
+        Obj * obj = *it;
+        g_vm.gray_objects.erase(it);
+
+        blacken_object(obj);
+    }
+}
+
+auto sweep() -> void
+{
+    std::vector<Obj *> new_objects;
+    for (auto * obj : g_vm.objects) {
+        if (obj->is_marked()) {
+            obj->clear_mark();
+            new_objects.push_back(obj);
+        }
+        else {
+            release_object(obj);
+        }
+    }
+    g_vm.objects = std::move(new_objects);
+}
+
+auto collect_garbage() -> void
+{
+    if constexpr (DEBUG_LOG_GC) {
+        std::println("-- gc begin");
+    }
+
+    std::size_t before = g_vm.bytes_allocated;
+
+    mark_roots();
+    trace_references();
+    sweep();
+
+    g_vm.next_gc = g_vm.bytes_allocated * GC_HEAP_GROW_FACTOR;
+
+    if constexpr (DEBUG_LOG_GC) {
+        std::println("-- gc end");
+        std::println(
+                "   collected {} bytes (from {} to {}), next gc at {}",
+                before - g_vm.bytes_allocated,
+                before,
+                g_vm.bytes_allocated,
+                g_vm.next_gc
+        );
+    }
+}
+
+}} // namespace cpplox

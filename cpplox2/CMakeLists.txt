@@ -5,13 +5,13 @@ target_sources(cpplox2
     FILE_SET cxx_modules TYPE CXX_MODULES FILES
       cpplox/Chunk.cpp
       cpplox/Compiler.cpp
+      cpplox/CompilerImpl.cpp
       cpplox/Debug.cpp
       cpplox/EnumFormatter.cpp
       cpplox/Object.cpp
       cpplox/Scanner.cpp
       cpplox/SourceLocation.cpp
       cpplox/Value.cpp
-      cpplox/ValueFormatter.cpp
       cpplox/VirtualMachine.cpp
       cpplox/VirtualMachineImpl.cpp
       cpplox/exits.cpp

@@ -308,9 +308,12 @@ auto run() -> InterpretResult
         // Binary ops
         case Add: {
             if (peek_value(0).is_string() && peek_value(1).is_string()) {
-                const auto & rhs = pop_value().as_string();
-                const auto & lhs = pop_value().as_string();
-                push_value(Value::string(lhs + rhs));
+                const auto & rhs = peek_value(0).as_string();
+                const auto & lhs = peek_value(1).as_string();
+                auto value = Value::string(lhs + rhs);
+                pop_value();
+                pop_value();
+                push_value(value);
             }
             else if (peek_value(0).is_number() && peek_value(1).is_number()) {
                 double rhs = pop_value().as_number();
@@ -425,8 +428,8 @@ export auto init_vm() -> void
 
 export auto free_vm() -> void
 {
-    for (const auto * obj : g_vm.objects) {
-        delete obj;
+    for (auto * obj : g_vm.objects) {
+        release_object(obj);
     }
     g_vm.objects.clear();
 }
