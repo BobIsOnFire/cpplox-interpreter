@@ -8,7 +8,9 @@ namespace cpplox {
 
 export class Obj;
 export class ObjString;
+export class ObjUpvalue;
 export class ObjFunction;
+export class ObjClosure;
 export class ObjNative;
 
 export enum class ValueType : std::uint8_t {
@@ -60,7 +62,9 @@ public:
     static constexpr auto obj(Obj * obj) -> Value { return {ValueType::Obj, {.obj = obj}}; }
 
     static constexpr auto string(std::string data) -> Value;
+    static constexpr auto upvalue(Value *) -> Value;
     static constexpr auto function(std::string name) -> Value;
+    static constexpr auto closure(ObjFunction *) -> Value;
     static constexpr auto native(NativeFn) -> Value;
 
     // Casts
@@ -72,7 +76,9 @@ public:
     // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 
     [[nodiscard]] constexpr auto as_objstring() const -> ObjString *;
+    [[nodiscard]] constexpr auto as_objupvalue() const -> ObjUpvalue *;
     [[nodiscard]] constexpr auto as_objfunction() const -> ObjFunction *;
+    [[nodiscard]] constexpr auto as_objclosure() const -> ObjClosure *;
     [[nodiscard]] constexpr auto as_objnative() const -> ObjNative *;
 
     [[nodiscard]] constexpr auto as_string() const -> const std::string &;
@@ -88,7 +94,9 @@ public:
     [[nodiscard]] constexpr auto is_obj() const -> bool { return is(ValueType::Obj); }
 
     [[nodiscard]] constexpr auto is_string() const -> bool;
+    [[nodiscard]] constexpr auto is_upvalue() const -> bool;
     [[nodiscard]] constexpr auto is_function() const -> bool;
+    [[nodiscard]] constexpr auto is_closure() const -> bool;
     [[nodiscard]] constexpr auto is_native() const -> bool;
 
     auto operator==(const Value & other) const -> bool;

@@ -9,7 +9,7 @@ namespace cpplox {
 
 export struct CallFrame
 {
-    ObjFunction * function;
+    ObjClosure * closure;
     const Byte * ip;
     Value * slots; // TODO: std::span? or store offset?
 };
@@ -20,6 +20,8 @@ export struct VirtualMachine
     std::vector<Value> stack;
     std::vector<Obj *> objects;
     std::unordered_map<std::string, Value> globals;
+    // TODO: intrusive list used to guarantee sorted order. Could be an std::set or std::list?
+    ObjUpvalue * open_upvalues = nullptr; // intrusive list
 };
 
 // TODO: make this store error only, and use std::expected<std::monostate, InterpretError> for this

@@ -22,7 +22,7 @@ constexpr const bool DEBUG_VM_EXECUTION = false;
 namespace {
 
 auto current_frame() -> CallFrame & { return g_vm.frames.back(); }
-auto current_chunk() -> Chunk & { return current_frame().function->get_chunk(); }
+auto current_chunk() -> Chunk & { return current_frame().closure->get_function()->get_chunk(); }
 
 auto read_byte() -> Byte
 {
@@ -32,6 +32,8 @@ auto read_byte() -> Byte
 }
 
 auto read_instruction() -> OpCode { return static_cast<OpCode>(read_byte()); }
+
+auto read_constant() -> Value { return current_chunk().constants[read_byte()]; }
 
 auto read_double_byte() -> DoubleByte
 {
@@ -43,7 +45,7 @@ template <typename... Args> auto runtime_error(std::format_string<Args...> fmt, 
     std::println(std::cerr, fmt, std::forward<Args>(args)...);
 
     for (const auto & frame : std::ranges::reverse_view{g_vm.frames}) {
-        const auto * function = frame.function;
+        const auto * function = frame.closure->get_function();
 
         const auto & chunk = function->get_chunk();
         auto chunk_offset = static_cast<std::size_t>(std::distance(chunk.code.data(), frame.ip));
@@ -121,13 +123,12 @@ auto is_falsey(Value value) -> bool
     return value.is_nil() || (value.is_boolean() && !value.as_boolean());
 }
 
-auto get_constant() -> Value { return current_chunk().constants[read_byte()]; }
-
 // FIXME: should return InterpretResult or some other error type?
-auto call(ObjFunction & function, Byte arg_count) -> bool
+auto call(ObjClosure & closure, Byte arg_count) -> bool
 {
-    if (arg_count != function.get_arity()) {
-        runtime_error("Expected {} arguments but got {}.", function.get_arity(), arg_count);
+    auto & function = *closure.get_function();
+    if (arg_count != function.arity()) {
+        runtime_error("Expected {} arguments but got {}.", function.arity(), arg_count);
         return false;
     }
 
@@ -139,7 +140,7 @@ auto call(ObjFunction & function, Byte arg_count) -> bool
     auto slot_start = g_vm.stack.size() - arg_count - 1;
 
     g_vm.frames.push_back({
-            .function = &function,
+            .closure = &closure,
             .ip = function.get_chunk().code.data(),
             .slots = &g_vm.stack[slot_start],
     });
@@ -149,8 +150,8 @@ auto call(ObjFunction & function, Byte arg_count) -> bool
 
 auto call_value(Value callee, Byte arg_count) -> bool
 {
-    if (callee.is_function()) {
-        return call(*callee.as_objfunction(), arg_count);
+    if (callee.is_closure()) {
+        return call(*callee.as_objclosure(), arg_count);
     }
     if (callee.is_native()) {
         Value::NativeFn callable = callee.as_native();
@@ -166,6 +167,43 @@ auto call_value(Value callee, Byte arg_count) -> bool
 
     runtime_error("Can only call functions and classes.");
     return false;
+}
+
+auto capture_upvalue(Value * local) -> ObjUpvalue *
+{
+    ObjUpvalue * prev = nullptr;
+    ObjUpvalue * upvalue = g_vm.open_upvalues;
+
+    // well this is a huge pile of ptr comparison bullshit idk
+    while (upvalue != nullptr && upvalue->location() > local) {
+        prev = upvalue;
+        upvalue = upvalue->next();
+    }
+
+    if (upvalue != nullptr && upvalue->location() == local) {
+        return upvalue;
+    }
+
+    auto * created_upvalue = ObjUpvalue::create(local);
+    created_upvalue->set_next(upvalue);
+
+    if (prev == nullptr) {
+        g_vm.open_upvalues = created_upvalue;
+    }
+    else {
+        prev->set_next(created_upvalue);
+    }
+
+    return created_upvalue;
+}
+
+auto close_upvalues(Value * last) -> void
+{
+    while (g_vm.open_upvalues != nullptr && g_vm.open_upvalues->location() >= last) {
+        auto * upvalue = g_vm.open_upvalues;
+        upvalue->close();
+        g_vm.open_upvalues = upvalue->next();
+    }
 }
 
 auto define_native(std::string_view name, Value::NativeFn callable) -> void
@@ -202,7 +240,7 @@ auto run() -> InterpretResult
         switch (read_instruction()) {
         // Values
         case Constant: {
-            push_value(get_constant());
+            push_value(read_constant());
             break;
         }
         case Nil: push_value(Value::nil()); break;
@@ -211,7 +249,7 @@ auto run() -> InterpretResult
         // Value manipulators
         case Pop: pop_value(); break;
         case DefineGlobal: {
-            const std::string & name = get_constant().as_string();
+            const std::string & name = read_constant().as_string();
             // FIXME: is there a way to get rid of copy on key insert? Key will surely live as long
             // as VM lives
             g_vm.globals.emplace(name, peek_value());
@@ -219,7 +257,7 @@ auto run() -> InterpretResult
             break;
         }
         case GetGlobal: {
-            const std::string & name = get_constant().as_string();
+            const std::string & name = read_constant().as_string();
             auto it = g_vm.globals.find(name);
             if (it == g_vm.globals.end()) {
                 runtime_error("Undefined variable '{}'", name);
@@ -233,8 +271,13 @@ auto run() -> InterpretResult
             push_value(current_frame().slots[slot]);
             break;
         }
+        case GetUpvalue: {
+            Byte slot = read_byte();
+            push_value(*current_frame().closure->upvalues()[slot]->location());
+            break;
+        }
         case SetGlobal: {
-            const std::string & name = get_constant().as_string();
+            const std::string & name = read_constant().as_string();
             auto it = g_vm.globals.find(name);
             if (it == g_vm.globals.end()) {
                 runtime_error("Undefined variable '{}'", name);
@@ -246,6 +289,11 @@ auto run() -> InterpretResult
         case SetLocal: {
             Byte slot = read_byte();
             current_frame().slots[slot] = peek_value();
+            break;
+        }
+        case SetUpvalue: {
+            Byte slot = read_byte();
+            *current_frame().closure->upvalues()[slot]->location() = peek_value();
             break;
         }
         // Comparison ops
@@ -313,9 +361,33 @@ auto run() -> InterpretResult
             }
             break;
         }
+        case Closure: {
+            auto * function = read_constant().as_objfunction();
+            auto * closure = ObjClosure::create(function);
+            push_value(Value::obj(closure));
+
+            for (auto _ : std::views::iota(0UZ, function->upvalue_count())) {
+                bool is_local = read_byte() == 1;
+                Byte index = read_byte();
+                if (is_local) {
+                    closure->add_upvalue(capture_upvalue(&current_frame().slots[index]));
+                }
+                else {
+                    closure->add_upvalue(current_frame().closure->upvalues()[index]);
+                }
+            }
+            break;
+        }
+        case CloseUpvalue: {
+            close_upvalues(&g_vm.stack.back());
+            pop_value();
+            break;
+        }
         case Return: {
             Value result = pop_value();
             auto * old_slots = g_vm.frames.back().slots;
+            close_upvalues(old_slots);
+
             g_vm.frames.pop_back();
             if (g_vm.frames.empty()) {
                 pop_value();
@@ -371,7 +443,10 @@ export auto interpret(std::string_view source) -> InterpretResult
     g_vm.stack.reserve(STACK_MAX);
 
     push_value(Value::obj(function));
-    call(*function, 0);
+    auto * closure = ObjClosure::create(function);
+    pop_value();
+    push_value(Value::obj(closure));
+    call(*closure, 0);
 
     return run();
 }

@@ -31,8 +31,10 @@ export enum class OpCode : Byte {
     DefineGlobal,
     GetGlobal,
     GetLocal,
+    GetUpvalue,
     SetGlobal,
     SetLocal,
+    SetUpvalue,
     // Comparison ops
     Equal,
     Greater,
@@ -51,6 +53,8 @@ export enum class OpCode : Byte {
     JumpIfFalse,
     Loop,
     Call,
+    Closure,
+    CloseUpvalue,
     Return,
 };
 

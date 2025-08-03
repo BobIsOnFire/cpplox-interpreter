@@ -62,6 +62,13 @@ struct Local
 {
     Token name;
     int depth = 0;
+    bool is_captured;
+};
+
+struct Upvalue
+{
+    Byte index;
+    bool is_local;
 };
 
 enum class FunctionType : std::uint8_t
@@ -77,6 +84,7 @@ struct Compiler
     FunctionType type = FunctionType::Script;
 
     std::vector<Local> locals;
+    std::vector<Upvalue> upvalues;
     int scope_depth = 0;
 };
 
@@ -246,9 +254,11 @@ auto init_compiler(Compiler & compiler, FunctionType type) -> void
             std::string{type == FunctionType::Script ? "" : g_parser.previous.lexeme}
     );
     compiler.type = type;
-    compiler.locals.push_back(
-            {.name = {.type = TokenType::EndOfFile, .lexeme = "", .sloc = {}}, .depth = 0}
-    );
+    compiler.locals.push_back({
+            .name = {.type = TokenType::EndOfFile, .lexeme = "", .sloc = {}},
+            .depth = 0,
+            .is_captured = false,
+    });
 
     g_current_compiler = &compiler;
 }
@@ -277,8 +287,13 @@ auto end_scope() -> void
 
     while (g_current_compiler->locals.size() > 0
            && g_current_compiler->locals.back().depth > g_current_compiler->scope_depth) {
+        if (g_current_compiler->locals.back().is_captured) {
+            emit_byte(OpCode::CloseUpvalue);
+        }
+        else {
+            emit_byte(OpCode::Pop);
+        }
         g_current_compiler->locals.pop_back();
-        emit_byte(OpCode::Pop);
     }
 }
 
@@ -294,7 +309,11 @@ auto add_local(const Token & name) -> void
         return;
     }
 
-    g_current_compiler->locals.emplace_back(name, -1);
+    g_current_compiler->locals.push_back({
+            .name = name,
+            .depth = -1,
+            .is_captured = false,
+    });
 }
 
 auto resolve_local(Compiler * compiler, const Token & name) -> std::optional<std::size_t>
@@ -309,6 +328,44 @@ auto resolve_local(Compiler * compiler, const Token & name) -> std::optional<std
             return idx;
         }
     }
+    return std::nullopt;
+}
+
+auto add_upvalue(Compiler * compiler, Byte index, bool is_local) -> std::size_t
+{
+    for (const auto & [idx, upvalue] : std::ranges::enumerate_view(compiler->upvalues)) {
+        if (upvalue.index == index && upvalue.is_local == is_local) {
+            return static_cast<std::size_t>(idx);
+        }
+    }
+
+    if (compiler->upvalues.size() >= BYTE_MAX) {
+        error("Too many closure variables in function.");
+        return 0;
+    }
+
+    compiler->upvalues.push_back({.index = index, .is_local = is_local});
+    return compiler->function->upvalue_count()++;
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+auto resolve_upvalue(Compiler * compiler, const Token & name) -> std::optional<std::size_t>
+{
+    if (compiler->enclosing == nullptr) {
+        return std::nullopt;
+    }
+
+    auto local = resolve_local(compiler->enclosing, name);
+    if (local.has_value()) {
+        compiler->enclosing->locals[local.value()].is_captured = true;
+        return add_upvalue(compiler, static_cast<Byte>(local.value()), /* is_local = */ true);
+    }
+
+    auto upvalue = resolve_upvalue(compiler->enclosing, name);
+    if (upvalue.has_value()) {
+        return add_upvalue(compiler, static_cast<Byte>(upvalue.value()), /* is_local = */ false);
+    }
+
     return std::nullopt;
 }
 
@@ -470,11 +527,16 @@ auto named_variable(const Token & name, ParseContext ctx) -> void
     OpCode set_op = OpCode::SetGlobal;
     Byte arg = 0;
 
-    auto local_pos = resolve_local(g_current_compiler, name);
-    if (local_pos.has_value()) {
+    if (auto local_pos = resolve_local(g_current_compiler, name); local_pos.has_value()) {
         get_op = OpCode::GetLocal;
         set_op = OpCode::SetLocal;
         arg = static_cast<Byte>(local_pos.value());
+    }
+    else if (auto upvalue_pos = resolve_upvalue(g_current_compiler, name);
+             upvalue_pos.has_value()) {
+        get_op = OpCode::GetUpvalue;
+        set_op = OpCode::SetUpvalue;
+        arg = static_cast<Byte>(upvalue_pos.value());
     }
     else {
         get_op = OpCode::GetGlobal;
@@ -586,8 +648,8 @@ auto function(FunctionType type) -> void
     consume(TokenType::LeftParenthesis, "Expect '(' after function name.");
     if (!check(TokenType::RightParenthesis)) {
         do {
-            g_current_compiler->function->get_arity()++;
-            if (g_current_compiler->function->get_arity() > MAX_ARITY) {
+            g_current_compiler->function->arity()++;
+            if (g_current_compiler->function->arity() > MAX_ARITY) {
                 error_at_current("Can't have more than 255 parameters.");
             }
             Byte constant = parse_variable("Expect parameter name.");
@@ -599,7 +661,11 @@ auto function(FunctionType type) -> void
     block();
 
     auto * function = end_compiler();
-    emit_bytes(OpCode::Constant, make_constant(Value::obj(function)));
+    emit_bytes(OpCode::Closure, make_constant(Value::obj(function)));
+
+    for (const auto & upvalue : compiler.upvalues) {
+        emit_bytes(upvalue.is_local ? Byte(1) : Byte(0), upvalue.index);
+    }
 }
 
 auto fun_declaration() -> void

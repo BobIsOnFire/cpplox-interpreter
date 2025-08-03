@@ -89,8 +89,10 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case DefineGlobal: return constant("OP_DEFINE_GLOBAL", chunk, offset);
     case GetGlobal: return constant("OP_GET_GLOBAL", chunk, offset);
     case GetLocal: return byte("OP_GET_LOCAL", chunk, offset);
+    case GetUpvalue: return byte("OP_GET_UPVALUE", chunk, offset);
     case SetGlobal: return constant("OP_SET_GLOBAL", chunk, offset);
     case SetLocal: return byte("OP_SET_LOCAL", chunk, offset);
+    case SetUpvalue: return byte("OP_SET_UPVALUE", chunk, offset);
     // Comparison ops
     case Equal: return simple("OP_EQUAL", offset);
     case Less: return simple("OP_LESS", offset);
@@ -109,6 +111,21 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case JumpIfFalse: return jump("OP_JUMP_IF_FALSE", /* forward = */ true, chunk, offset);
     case Loop: return jump("OP_LOOP", /* forward = */ false, chunk, offset);
     case Call: return byte("OP_CALL", chunk, offset);
+    case Closure: {
+        offset++;
+        Byte constant = chunk.code[offset++];
+        std::println("{:16} {:4} {}", "OP_CLOSURE", constant, chunk.constants[constant]);
+
+        auto * function = chunk.constants[constant].as_objfunction();
+        for (auto _ : std::views::iota(0UZ, function->upvalue_count())) {
+            bool is_local = chunk.code[offset++] == 1;
+            Byte index = chunk.code[offset++];
+            std::print("{:04} {:>4} {:<4} ", offset - 2, ' ', ' ');
+            std::println("{:16} {:4} {} {}", '|', ' ', is_local ? "local" : "upvalue", index);
+        }
+        return offset;
+    }
+    case CloseUpvalue: return simple("OP_CLOSE_UPVALUE", offset);
     case Return: return simple("OP_RETURN", offset);
     }
 
