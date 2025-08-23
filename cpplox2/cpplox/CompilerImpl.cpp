@@ -505,6 +505,20 @@ auto call(ParseContext /* ctx */) -> void
     emit_bytes(OpCode::Call, arg_count);
 }
 
+auto dot(ParseContext ctx) -> void
+{
+    consume(TokenType::Identifier, "Expect property name after '.'.");
+    Byte name = identifier_constant(g_parser.previous);
+
+    if (ctx.can_assign && match(TokenType::Equal)) {
+        expression();
+        emit_bytes(OpCode::SetProperty, name);
+    }
+    else {
+        emit_bytes(OpCode::GetProperty, name);
+    }
+}
+
 // *** Statement Parser ***
 
 // It's a recursive descent parser, duh!
@@ -594,6 +608,19 @@ auto function(FunctionType type) -> void
     for (const auto & upvalue : compiler.upvalues) {
         emit_bytes(upvalue.is_local ? Byte(1) : Byte(0), upvalue.index);
     }
+}
+
+auto class_declaration() -> void
+{
+    consume(TokenType::Identifier, "Expect class name.");
+    Byte name_constant = identifier_constant(g_parser.previous);
+    declare_variable();
+
+    emit_bytes(OpCode::Class, name_constant);
+    define_variable(name_constant);
+
+    consume(TokenType::LeftBrace, "Expect '{' before class body.");
+    consume(TokenType::RightBrace, "Expect '}' after class body.");
 }
 
 auto fun_declaration() -> void
@@ -729,7 +756,10 @@ auto statement() -> void
 
 auto declaration() -> void
 {
-    if (match(TokenType::Fun)) {
+    if (match(TokenType::Class)) {
+        class_declaration();
+    }
+    else if (match(TokenType::Fun)) {
         fun_declaration();
     }
     else if (match(TokenType::Var)) {
@@ -762,6 +792,7 @@ consteval auto generate_rule_table() noexcept
     rules[to_idx(TokenType::And)]             = {.prefix = nullptr,  .infix = and_ex,  .precedence = And};
     rules[to_idx(TokenType::Bang)]            = {.prefix = unary,    .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::BangEqual)]       = {.prefix = nullptr,  .infix = binary,  .precedence = Equality};
+    rules[to_idx(TokenType::Dot)]             = {.prefix = nullptr,  .infix = dot,     .precedence = Call};
     rules[to_idx(TokenType::EqualEqual)]      = {.prefix = nullptr,  .infix = binary,  .precedence = Equality};
     rules[to_idx(TokenType::False)]           = {.prefix = literal,  .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::Greater)]         = {.prefix = nullptr,  .infix = binary,  .precedence = Comparison};

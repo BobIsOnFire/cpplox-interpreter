@@ -13,8 +13,10 @@ import magic_enum;
 namespace cpplox {
 
 export enum class ObjType : std::uint8_t {
+    Class,
     Closure,
     Function,
+    Instance,
     Native,
     String,
     Upvalue,
@@ -44,7 +46,7 @@ private:
 
 namespace {
 constexpr const bool DEBUG_RUN_GC_EVERY_TIME = false;
-constexpr const bool DEBUG_LOG_GC = true;
+constexpr const bool DEBUG_LOG_GC = false;
 constexpr const std::size_t GC_HEAP_GROW_FACTOR = 2;
 
 auto object_size(ObjType type) -> std::size_t;
@@ -251,6 +253,74 @@ private:
     std::vector<ObjUpvalue *> m_upvalues;
 };
 
+export class ObjClass : public Obj
+{
+public:
+    explicit ObjClass(ObjString * name)
+        : Obj(ObjType::Class)
+        , m_name(name)
+    {
+    }
+
+    constexpr static auto create(ObjString * name) -> ObjClass *
+    {
+        auto * obj = make_object<ObjClass>(name);
+        return obj;
+    }
+
+    [[nodiscard]] constexpr auto get_name() const -> ObjString * { return m_name; }
+
+private:
+    ObjString * m_name; // TODO: somehow use string_view into source code instead?
+};
+
+export class ObjInstance : public Obj
+{
+public:
+    explicit ObjInstance(ObjClass * cls)
+        : Obj(ObjType::Instance)
+        , m_class(cls)
+    {
+    }
+
+    constexpr static auto create(ObjClass * cls) -> ObjInstance *
+    {
+        auto * obj = make_object<ObjInstance>(cls);
+        return obj;
+    }
+
+    [[nodiscard]] constexpr auto get_class() const -> ObjClass * { return m_class; }
+
+    [[nodiscard]] constexpr auto get_field(const std::string & name) const -> std::optional<Value>
+    {
+        auto it = m_fields.find(name);
+        if (it != m_fields.end()) {
+            return it->second;
+        }
+        return std::nullopt;
+    }
+
+    constexpr auto set_field(const std::string & name, Value value) -> void
+    {
+        auto it = m_fields.find(name);
+        if (it != m_fields.end()) {
+            it->second = value;
+        }
+        else {
+            m_fields.emplace(name, value);
+        }
+    }
+
+    [[nodiscard]] constexpr auto all_fields() const -> std::unordered_map<std::string, Value>
+    {
+        return m_fields;
+    }
+
+private:
+    ObjClass * m_class;
+    std::unordered_map<std::string, Value> m_fields;
+};
+
 // TODO: feels complicated that there are out-of-class definitions in a
 // completely separate module
 constexpr auto Value::string(std::string data) -> Value
@@ -278,6 +348,16 @@ constexpr auto Value::native(Value::NativeFn callable) -> Value
     return {ValueType::Obj, {.obj = ObjNative::create(callable)}};
 }
 
+constexpr auto Value::cls(ObjString * name) -> Value
+{
+    return {ValueType::Obj, {.obj = ObjClass::create(name)}};
+}
+
+constexpr auto Value::instance(ObjClass * cls) -> Value
+{
+    return {ValueType::Obj, {.obj = ObjInstance::create(cls)}};
+}
+
 constexpr auto Value::is_string() const -> bool
 {
     return value_is_obj_type<ObjType::String>(*this);
@@ -303,6 +383,13 @@ constexpr auto Value::is_native() const -> bool
     return value_is_obj_type<ObjType::Native>(*this);
 }
 
+constexpr auto Value::is_class() const -> bool { return value_is_obj_type<ObjType::Class>(*this); }
+
+constexpr auto Value::is_instance() const -> bool
+{
+    return value_is_obj_type<ObjType::Instance>(*this);
+}
+
 constexpr auto Value::as_objstring() const -> ObjString *
 {
     return dynamic_cast<ObjString *>(as_obj());
@@ -326,6 +413,16 @@ constexpr auto Value::as_objclosure() const -> ObjClosure *
 constexpr auto Value::as_objnative() const -> ObjNative *
 {
     return dynamic_cast<ObjNative *>(as_obj());
+}
+
+constexpr auto Value::as_objclass() const -> ObjClass *
+{
+    return dynamic_cast<ObjClass *>(as_obj());
+}
+
+constexpr auto Value::as_objinstance() const -> ObjInstance *
+{
+    return dynamic_cast<ObjInstance *>(as_obj());
 }
 
 constexpr auto Value::as_string() const -> const std::string & { return as_objstring()->data(); }
@@ -391,6 +488,16 @@ template <> struct std::formatter<cpplox::Value> : std::formatter<std::string_vi
                 return std::format_to(ctx.out(), "<fn {}>", name);
             }
             case cpplox::ObjType::Native: return std::format_to(ctx.out(), "<native fn>");
+            case cpplox::ObjType::Class:
+                return std::format_to(
+                        ctx.out(), "<class {}>", value.as_objclass()->get_name()->data()
+                );
+            case cpplox::ObjType::Instance:
+                return std::format_to(
+                        ctx.out(),
+                        "<class {} instance>",
+                        value.as_objinstance()->get_class()->get_name()->data()
+                );
             }
         }
     }
@@ -406,6 +513,8 @@ auto object_size(ObjType type) -> std::size_t
     case ObjType::Native: return sizeof(ObjNative);
     case ObjType::String: return sizeof(ObjString);
     case ObjType::Upvalue: return sizeof(ObjUpvalue);
+    case ObjType::Class: return sizeof(ObjClass);
+    case ObjType::Instance: return sizeof(ObjInstance);
     }
 }
 
@@ -467,6 +576,19 @@ auto blacken_object(Obj * obj) -> void
     case ObjType::Native:
     case ObjType::String: break;
     case ObjType::Upvalue: mark_value(*dynamic_cast<ObjUpvalue *>(obj)->location()); break;
+    case ObjType::Class: {
+        auto * cls = dynamic_cast<ObjClass *>(obj);
+        mark_object(cls->get_name());
+        break;
+    }
+    case ObjType::Instance: {
+        auto * instance = dynamic_cast<ObjInstance *>(obj);
+        mark_object(instance->get_class());
+        for (const auto & [_, value] : instance->all_fields()) {
+            mark_value(value);
+        }
+        break;
+    }
     }
 }
 

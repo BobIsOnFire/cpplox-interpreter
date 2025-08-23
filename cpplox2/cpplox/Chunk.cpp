@@ -31,9 +31,11 @@ export enum class OpCode : Byte {
     DefineGlobal,
     GetGlobal,
     GetLocal,
+    GetProperty,
     GetUpvalue,
     SetGlobal,
     SetLocal,
+    SetProperty,
     SetUpvalue,
     // Comparison ops
     Equal,
@@ -56,6 +58,7 @@ export enum class OpCode : Byte {
     Closure,
     CloseUpvalue,
     Return,
+    Class,
 };
 
 export struct Chunk

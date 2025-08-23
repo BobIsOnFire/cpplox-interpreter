@@ -150,6 +150,12 @@ auto call(ObjClosure & closure, Byte arg_count) -> bool
 
 auto call_value(Value callee, Byte arg_count) -> bool
 {
+    if (callee.is_class()) {
+        auto * cls = callee.as_objclass();
+        // TODO initializer, argument handling...
+        push_value(Value::instance(cls));
+        return true;
+    }
     if (callee.is_closure()) {
         return call(*callee.as_objclosure(), arg_count);
     }
@@ -271,6 +277,25 @@ auto run() -> InterpretResult
             push_value(current_frame().slots[slot]);
             break;
         }
+        case GetProperty: {
+            if (!peek_value().is_instance()) {
+                runtime_error("Only instances have properties.");
+                return InterpretResult::RuntimeError;
+            }
+
+            auto * instance = peek_value().as_objinstance();
+            const std::string & name = read_constant().as_string();
+
+            auto property = instance->get_field(name);
+            if (property.has_value()) {
+                pop_value(); // instance object still on the stack
+                push_value(property.value());
+                break;
+            }
+
+            runtime_error("Undefined property '{}'.", name);
+            return InterpretResult::RuntimeError;
+        }
         case GetUpvalue: {
             Byte slot = read_byte();
             push_value(*current_frame().closure->upvalues()[slot]->location());
@@ -289,6 +314,23 @@ auto run() -> InterpretResult
         case SetLocal: {
             Byte slot = read_byte();
             current_frame().slots[slot] = peek_value();
+            break;
+        }
+        case SetProperty: {
+            if (!peek_value(1).is_instance()) {
+                runtime_error("Only instances have properties.");
+                return InterpretResult::RuntimeError;
+            }
+
+            auto * instance = peek_value(1).as_objinstance();
+            const std::string & name = read_constant().as_string();
+
+            instance->set_field(name, peek_value());
+
+            Value value = pop_value();
+            pop_value(); // instance
+
+            push_value(value);
             break;
         }
         case SetUpvalue: {
@@ -403,6 +445,10 @@ auto run() -> InterpretResult
             }
             push_value(result);
             break;
+        }
+        case Class: {
+            auto * name = read_constant().as_objstring();
+            push_value(Value::cls(name));
         }
         }
 

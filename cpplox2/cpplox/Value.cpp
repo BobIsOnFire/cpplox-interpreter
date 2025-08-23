@@ -12,6 +12,8 @@ export class ObjUpvalue;
 export class ObjFunction;
 export class ObjClosure;
 export class ObjNative;
+export class ObjClass;
+export class ObjInstance;
 
 export enum class ValueType : std::uint8_t {
     Boolean,
@@ -61,11 +63,13 @@ public:
     // behind our Obj * field?
     static constexpr auto obj(Obj * obj) -> Value { return {ValueType::Obj, {.obj = obj}}; }
 
-    static constexpr auto string(std::string data) -> Value;
+    static constexpr auto string(std::string) -> Value;
     static constexpr auto upvalue(Value *) -> Value;
-    static constexpr auto function(std::string name) -> Value;
+    static constexpr auto function(std::string) -> Value;
     static constexpr auto closure(ObjFunction *) -> Value;
     static constexpr auto native(NativeFn) -> Value;
+    static constexpr auto cls(ObjString *) -> Value;
+    static constexpr auto instance(ObjClass *) -> Value;
 
     // Casts
 
@@ -80,6 +84,8 @@ public:
     [[nodiscard]] constexpr auto as_objfunction() const -> ObjFunction *;
     [[nodiscard]] constexpr auto as_objclosure() const -> ObjClosure *;
     [[nodiscard]] constexpr auto as_objnative() const -> ObjNative *;
+    [[nodiscard]] constexpr auto as_objclass() const -> ObjClass *;
+    [[nodiscard]] constexpr auto as_objinstance() const -> ObjInstance *;
 
     [[nodiscard]] constexpr auto as_string() const -> const std::string &;
     [[nodiscard]] constexpr auto as_native() const -> NativeFn;
@@ -98,6 +104,8 @@ public:
     [[nodiscard]] constexpr auto is_function() const -> bool;
     [[nodiscard]] constexpr auto is_closure() const -> bool;
     [[nodiscard]] constexpr auto is_native() const -> bool;
+    [[nodiscard]] constexpr auto is_class() const -> bool;
+    [[nodiscard]] constexpr auto is_instance() const -> bool;
 
     auto operator==(const Value & other) const -> bool;
 

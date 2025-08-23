@@ -89,9 +89,11 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case DefineGlobal: return constant("OP_DEFINE_GLOBAL", chunk, offset);
     case GetGlobal: return constant("OP_GET_GLOBAL", chunk, offset);
     case GetLocal: return byte("OP_GET_LOCAL", chunk, offset);
+    case GetProperty: return constant("OP_GET_PROPERTY", chunk, offset);
     case GetUpvalue: return byte("OP_GET_UPVALUE", chunk, offset);
     case SetGlobal: return constant("OP_SET_GLOBAL", chunk, offset);
     case SetLocal: return byte("OP_SET_LOCAL", chunk, offset);
+    case SetProperty: return constant("OP_SET_PROPERTY", chunk, offset);
     case SetUpvalue: return byte("OP_SET_UPVALUE", chunk, offset);
     // Comparison ops
     case Equal: return simple("OP_EQUAL", offset);
@@ -127,6 +129,7 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     }
     case CloseUpvalue: return simple("OP_CLOSE_UPVALUE", offset);
     case Return: return simple("OP_RETURN", offset);
+    case Class: return constant("OP_CLASS", chunk, offset);
     }
 
     std::println("Unknown opcode {:x}", static_cast<Byte>(instruction));
