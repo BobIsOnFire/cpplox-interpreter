@@ -239,6 +239,11 @@ auto identifier_constant(const Token & name) -> Byte
     return make_constant(Value::string(std::string{name.lexeme}));
 }
 
+auto synthetic_token(std::string_view name) -> Token
+{
+    return {.type = TokenType::Identifier, .lexeme = name, .sloc = g_parser.previous.sloc};
+}
+
 auto add_local(const Token & name) -> void
 {
     if (g_current_compiler->locals.size() > BYTE_MAX) {
@@ -523,6 +528,34 @@ auto call(ParseContext /* ctx */) -> void
     emit_bytes(OpCode::Call, arg_count);
 }
 
+auto super_ex(ParseContext /* ctx */) -> void
+{
+    if (g_current_class == nullptr) {
+        error("Can't use 'super' outside of a class.");
+    }
+    else if (!g_current_class->has_superclass) {
+        error("Can't use 'super' in a class with no superclass.");
+    }
+
+    consume(TokenType::Dot, "Expect '.' after 'super'.");
+    consume(TokenType::Identifier, "Expect superclass method name.");
+
+    Byte name = identifier_constant(g_parser.previous);
+
+    named_variable(synthetic_token("this"), {.can_assign = false});
+
+    if (match(TokenType::LeftParenthesis)) {
+        Byte arg_count = argument_list();
+        named_variable(synthetic_token("super"), {.can_assign = false});
+        emit_bytes(OpCode::SuperInvoke, name);
+        emit_byte(arg_count);
+    }
+    else {
+        named_variable(synthetic_token("super"), {.can_assign = false});
+        emit_bytes(OpCode::GetSuper, name);
+    }
+}
+
 auto dot(ParseContext ctx) -> void
 {
     consume(TokenType::Identifier, "Expect property name after '.'.");
@@ -659,8 +692,25 @@ auto class_declaration() -> void
     emit_bytes(OpCode::Class, name_constant);
     define_variable(name_constant);
 
-    ClassCompiler class_compiler{.enclosing = g_current_class};
+    ClassCompiler class_compiler{.enclosing = g_current_class, .has_superclass = false};
     g_current_class = &class_compiler;
+
+    if (match(TokenType::Less)) {
+        consume(TokenType::Identifier, "Expect superclass name.");
+        variable({.can_assign = false});
+
+        if (class_name.lexeme == g_parser.previous.lexeme) {
+            error("A class can't inherit from itself.");
+        }
+
+        begin_scope();
+        add_local(synthetic_token("super"));
+        define_variable(0);
+
+        named_variable(class_name, {.can_assign = false});
+        emit_byte(OpCode::Inherit);
+        class_compiler.has_superclass = true;
+    }
 
     named_variable(class_name, {.can_assign = false});
 
@@ -670,6 +720,10 @@ auto class_declaration() -> void
     }
     consume(TokenType::RightBrace, "Expect '}' after class body.");
     emit_byte(OpCode::Pop);
+
+    if (g_current_class->has_superclass) {
+        end_scope();
+    }
 
     g_current_class = g_current_class->enclosing;
 }
@@ -860,6 +914,7 @@ consteval auto generate_rule_table() noexcept
     rules[to_idx(TokenType::Slash)]           = {.prefix = nullptr,  .infix = binary,  .precedence = Factor};
     rules[to_idx(TokenType::Star)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Factor};
     rules[to_idx(TokenType::String)]          = {.prefix = string,   .infix = nullptr, .precedence = None};
+    rules[to_idx(TokenType::Super)]           = {.prefix = super_ex, .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::This)]            = {.prefix = this_ex,  .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::True)]            = {.prefix = literal,  .infix = nullptr, .precedence = None};
     // clang-format on

@@ -105,6 +105,7 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case GetGlobal: return constant("OP_GET_GLOBAL", chunk, offset);
     case GetLocal: return byte("OP_GET_LOCAL", chunk, offset);
     case GetProperty: return constant("OP_GET_PROPERTY", chunk, offset);
+    case GetSuper: return constant("OP_GET_SUPER", chunk, offset);
     case GetUpvalue: return byte("OP_GET_UPVALUE", chunk, offset);
     case SetGlobal: return constant("OP_SET_GLOBAL", chunk, offset);
     case SetLocal: return byte("OP_SET_LOCAL", chunk, offset);
@@ -129,6 +130,7 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case Loop: return jump("OP_LOOP", /* forward = */ false, chunk, offset);
     case Call: return byte("OP_CALL", chunk, offset);
     case Invoke: return invoke("OP_INVOKE", chunk, offset);
+    case SuperInvoke: return invoke("OP_SUPER_INVOKE", chunk, offset);
     case Closure: {
         offset++;
         Byte constant = chunk.code[offset++];
@@ -146,6 +148,7 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case CloseUpvalue: return simple("OP_CLOSE_UPVALUE", offset);
     case Return: return simple("OP_RETURN", offset);
     case Class: return constant("OP_CLASS", chunk, offset);
+    case Inherit: return simple("OP_INHERIT", offset);
     case Method: return constant("OP_METHOD", chunk, offset);
     }
 

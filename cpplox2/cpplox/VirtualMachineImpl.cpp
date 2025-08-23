@@ -371,6 +371,16 @@ auto run() -> InterpretResult
             }
             break;
         }
+        case GetSuper: {
+            const std::string & name = read_constant().as_string();
+            auto * super = pop_value().as_objclass();
+
+            if (!bind_method(*super, name)) {
+                return InterpretResult::RuntimeError;
+            }
+
+            break;
+        }
         case GetUpvalue: {
             Byte slot = read_byte();
             push_value(*current_frame().closure->upvalues()[slot]->location());
@@ -490,6 +500,16 @@ auto run() -> InterpretResult
             }
             break;
         }
+        case SuperInvoke: {
+            const std::string & name = read_constant().as_string();
+            Byte arg_count = read_byte();
+            auto * super = pop_value().as_objclass();
+
+            if (!invoke_from_class(*super, name, arg_count)) {
+                return InterpretResult::RuntimeError;
+            }
+            break;
+        }
         case Closure: {
             auto * function = read_constant().as_objfunction();
             auto * closure = ObjClosure::create(function);
@@ -533,6 +553,24 @@ auto run() -> InterpretResult
         case Class: {
             auto * name = read_constant().as_objstring();
             push_value(Value::cls(name));
+            break;
+        }
+        case Inherit: {
+            Value superclass_val = peek_value(1);
+            if (!superclass_val.is_class()) {
+                runtime_error("Superclass must be a class.");
+                return InterpretResult::RuntimeError;
+            }
+
+            auto * superclass = superclass_val.as_objclass();
+            auto * subclass = peek_value(0).as_objclass();
+
+            for (const auto & [name, method] : superclass->all_methods()) {
+                subclass->add_method(name, method);
+            }
+
+            pop_value(); // subclass
+
             break;
         }
         case Method: {

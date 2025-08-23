@@ -80,6 +80,7 @@ struct Compiler
 struct ClassCompiler
 {
     ClassCompiler * enclosing = nullptr;
+    bool has_superclass = false;
 };
 
 // FIXME: get rid of singleton instance

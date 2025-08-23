@@ -32,6 +32,7 @@ export enum class OpCode : Byte {
     GetGlobal,
     GetLocal,
     GetProperty,
+    GetSuper,
     GetUpvalue,
     SetGlobal,
     SetLocal,
@@ -56,10 +57,12 @@ export enum class OpCode : Byte {
     Loop,
     Call,
     Invoke,
+    SuperInvoke,
     Closure,
     CloseUpvalue,
     Return,
     Class,
+    Inherit,
     Method,
 };
 
