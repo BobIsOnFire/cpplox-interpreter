@@ -61,6 +61,8 @@ struct Upvalue
 enum class FunctionType : std::uint8_t
 {
     Function,
+    Initializer,
+    Method,
     Script,
 };
 
@@ -75,10 +77,17 @@ struct Compiler
     int scope_depth = 0;
 };
 
+struct ClassCompiler
+{
+    ClassCompiler * enclosing = nullptr;
+};
+
 // FIXME: get rid of singleton instance
 Parser g_parser; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 Compiler * g_current_compiler = nullptr;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+ClassCompiler * g_current_class = nullptr;
 
 export auto compile(std::string_view source) -> ObjFunction *;
 

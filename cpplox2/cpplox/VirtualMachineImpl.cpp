@@ -150,10 +150,27 @@ auto call(ObjClosure & closure, Byte arg_count) -> bool
 
 auto call_value(Value callee, Byte arg_count) -> bool
 {
+    if (callee.is_bound_method()) {
+        auto * bound = callee.as_objboundmethod();
+        // place receiver before args on the stack to get 'this' resolved correctly to it
+        g_vm.stack[g_vm.stack.size() - arg_count - 1] = bound->get_receiver();
+        return call(*bound->get_method(), arg_count);
+    }
     if (callee.is_class()) {
         auto * cls = callee.as_objclass();
-        // TODO initializer, argument handling...
-        push_value(Value::instance(cls));
+        // place newly created instance before args on the stack to get 'this' resolved correctly to
+        // it
+        g_vm.stack[g_vm.stack.size() - arg_count - 1] = Value::instance(cls);
+
+        auto init = cls->get_method("init");
+        if (init.has_value()) {
+            return call(*init->as_objclosure(), arg_count);
+        }
+
+        if (arg_count != 0) {
+            runtime_error("Expected 0 arguments but got {}.", arg_count);
+        }
+
         return true;
     }
     if (callee.is_closure()) {
@@ -173,6 +190,53 @@ auto call_value(Value callee, Byte arg_count) -> bool
 
     runtime_error("Can only call functions and classes.");
     return false;
+}
+
+auto invoke_from_class(ObjClass & cls, const std::string & name, Byte arg_count) -> bool
+{
+    auto method = cls.get_method(name);
+    if (!method.has_value()) {
+        runtime_error("Undefined property '{}'.", name);
+        return false;
+    }
+
+    return call(*method->as_objclosure(), arg_count);
+}
+
+auto invoke(const std::string & name, Byte arg_count) -> bool
+{
+    Value receiver = peek_value(arg_count);
+
+    if (!receiver.is_instance()) {
+        runtime_error("Only instances have methods.");
+        return false;
+    }
+
+    auto * instance = receiver.as_objinstance();
+
+    auto field = instance->get_field(name);
+    if (field.has_value()) {
+        g_vm.stack[g_vm.stack.size() - arg_count - 1] = field.value();
+        return call_value(field.value(), arg_count);
+    }
+
+    return invoke_from_class(*instance->get_class(), name, arg_count);
+}
+
+auto bind_method(ObjClass & cls, const std::string & name) -> bool
+{
+    auto method = cls.get_method(name);
+    if (!method.has_value()) {
+        runtime_error("Undefined property '{}'.", name);
+        return false;
+    }
+
+    auto * bound = ObjBoundMethod::create(peek_value(), method.value().as_objclosure());
+
+    pop_value();
+    push_value(Value::obj(bound));
+
+    return true;
 }
 
 auto capture_upvalue(Value * local) -> ObjUpvalue *
@@ -210,6 +274,15 @@ auto close_upvalues(Value * last) -> void
         upvalue->close();
         g_vm.open_upvalues = upvalue->next();
     }
+}
+
+auto define_method(const std::string & name) -> void
+{
+    Value method = peek_value();
+    auto * cls = peek_value(1).as_objclass();
+
+    cls->add_method(name, method);
+    pop_value(); // once! leave class in place for consequent methods
 }
 
 auto define_native(std::string_view name, Value::NativeFn callable) -> void
@@ -293,8 +366,10 @@ auto run() -> InterpretResult
                 break;
             }
 
-            runtime_error("Undefined property '{}'.", name);
-            return InterpretResult::RuntimeError;
+            if (!bind_method(*instance->get_class(), name)) {
+                return InterpretResult::RuntimeError;
+            }
+            break;
         }
         case GetUpvalue: {
             Byte slot = read_byte();
@@ -406,6 +481,15 @@ auto run() -> InterpretResult
             }
             break;
         }
+        case Invoke: {
+            const std::string & name = read_constant().as_string();
+            Byte arg_count = read_byte();
+
+            if (!invoke(name, arg_count)) {
+                return InterpretResult::RuntimeError;
+            }
+            break;
+        }
         case Closure: {
             auto * function = read_constant().as_objfunction();
             auto * closure = ObjClosure::create(function);
@@ -449,6 +533,11 @@ auto run() -> InterpretResult
         case Class: {
             auto * name = read_constant().as_objstring();
             push_value(Value::cls(name));
+            break;
+        }
+        case Method: {
+            define_method(read_constant().as_string());
+            break;
         }
         }
 

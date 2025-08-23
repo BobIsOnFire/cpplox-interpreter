@@ -55,10 +55,12 @@ export enum class OpCode : Byte {
     JumpIfFalse,
     Loop,
     Call,
+    Invoke,
     Closure,
     CloseUpvalue,
     Return,
     Class,
+    Method,
 };
 
 export struct Chunk

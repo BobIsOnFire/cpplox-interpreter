@@ -171,7 +171,12 @@ auto emit_constant(Value value) -> void { emit_bytes(OpCode::Constant, make_cons
 
 auto emit_return() -> void
 {
-    emit_byte(OpCode::Nil);
+    if (g_current_compiler->type == FunctionType::Initializer) {
+        emit_bytes(OpCode::GetLocal, static_cast<Byte>(0));
+    }
+    else {
+        emit_byte(OpCode::Nil);
+    }
     emit_byte(OpCode::Return);
 }
 
@@ -183,7 +188,11 @@ auto init_compiler(Compiler & compiler, FunctionType type) -> void
     );
     compiler.type = type;
     compiler.locals.push_back({
-            .name = {.type = TokenType::EndOfFile, .lexeme = "", .sloc = {}},
+            .name = {
+                .type = TokenType::EndOfFile,
+                .lexeme = type == FunctionType::Function ? "" : "this",
+                .sloc = {},
+            },
             .depth = 0,
             .is_captured = false,
     });
@@ -483,6 +492,15 @@ auto named_variable(const Token & name, ParseContext ctx) -> void
 
 auto variable(ParseContext ctx) -> void { named_variable(g_parser.previous, ctx); }
 
+auto this_ex(ParseContext /* ctx */) -> void
+{
+    if (g_current_class == nullptr) {
+        error("Can't use 'this' outside of a class.");
+    }
+
+    variable({.can_assign = false});
+}
+
 auto argument_list() -> Byte
 {
     Byte arg_count = 0;
@@ -513,6 +531,11 @@ auto dot(ParseContext ctx) -> void
     if (ctx.can_assign && match(TokenType::Equal)) {
         expression();
         emit_bytes(OpCode::SetProperty, name);
+    }
+    else if (match(TokenType::LeftParenthesis)) {
+        Byte arg_count = argument_list();
+        emit_bytes(OpCode::Invoke, name);
+        emit_byte(arg_count);
     }
     else {
         emit_bytes(OpCode::GetProperty, name);
@@ -555,13 +578,17 @@ auto return_statement() -> void
     }
 
     if (match(TokenType::Semicolon)) {
-        emit_byte(OpCode::Nil);
+        emit_return();
     }
     else {
+        if (g_current_compiler->type == FunctionType::Initializer) {
+            error("Can't return a value from initializer.");
+        }
+
         expression();
         consume(TokenType::Semicolon, "Expect ';' after return value.");
+        emit_byte(OpCode::Return);
     }
-    emit_byte(OpCode::Return);
 }
 
 auto expression_statement() -> void
@@ -610,17 +637,41 @@ auto function(FunctionType type) -> void
     }
 }
 
+auto method() -> void
+{
+    consume(TokenType::Identifier, "Expect method name.");
+    Byte constant = identifier_constant(g_parser.previous);
+
+    auto type
+            = g_parser.previous.lexeme == "init" ? FunctionType::Initializer : FunctionType::Method;
+    function(type);
+
+    emit_bytes(OpCode::Method, constant);
+}
+
 auto class_declaration() -> void
 {
     consume(TokenType::Identifier, "Expect class name.");
+    Token class_name = g_parser.previous;
     Byte name_constant = identifier_constant(g_parser.previous);
     declare_variable();
 
     emit_bytes(OpCode::Class, name_constant);
     define_variable(name_constant);
 
+    ClassCompiler class_compiler{.enclosing = g_current_class};
+    g_current_class = &class_compiler;
+
+    named_variable(class_name, {.can_assign = false});
+
     consume(TokenType::LeftBrace, "Expect '{' before class body.");
+    while (!check(TokenType::RightBrace) && !check(TokenType::EndOfFile)) {
+        method();
+    }
     consume(TokenType::RightBrace, "Expect '}' after class body.");
+    emit_byte(OpCode::Pop);
+
+    g_current_class = g_current_class->enclosing;
 }
 
 auto fun_declaration() -> void
@@ -809,6 +860,7 @@ consteval auto generate_rule_table() noexcept
     rules[to_idx(TokenType::Slash)]           = {.prefix = nullptr,  .infix = binary,  .precedence = Factor};
     rules[to_idx(TokenType::Star)]            = {.prefix = nullptr,  .infix = binary,  .precedence = Factor};
     rules[to_idx(TokenType::String)]          = {.prefix = string,   .infix = nullptr, .precedence = None};
+    rules[to_idx(TokenType::This)]            = {.prefix = this_ex,  .infix = nullptr, .precedence = None};
     rules[to_idx(TokenType::True)]            = {.prefix = literal,  .infix = nullptr, .precedence = None};
     // clang-format on
 

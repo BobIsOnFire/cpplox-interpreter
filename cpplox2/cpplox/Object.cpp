@@ -13,6 +13,7 @@ import magic_enum;
 namespace cpplox {
 
 export enum class ObjType : std::uint8_t {
+    BoundMethod,
     Class,
     Closure,
     Function,
@@ -270,8 +271,34 @@ public:
 
     [[nodiscard]] constexpr auto get_name() const -> ObjString * { return m_name; }
 
+    [[nodiscard]] constexpr auto get_method(const std::string & name) -> std::optional<Value>
+    {
+        auto it = m_methods.find(name);
+        if (it != m_methods.end()) {
+            return it->second;
+        }
+        return std::nullopt;
+    }
+
+    constexpr auto add_method(const std::string & name, Value method) -> void
+    {
+        auto it = m_methods.find(name);
+        if (it != m_methods.end()) {
+            it->second = method;
+        }
+        else {
+            m_methods.emplace(name, method);
+        }
+    }
+
+    [[nodiscard]] constexpr auto all_methods() const -> std::unordered_map<std::string, Value>
+    {
+        return m_methods;
+    }
+
 private:
     ObjString * m_name; // TODO: somehow use string_view into source code instead?
+    std::unordered_map<std::string, Value> m_methods;
 };
 
 export class ObjInstance : public Obj
@@ -321,6 +348,31 @@ private:
     std::unordered_map<std::string, Value> m_fields;
 };
 
+export class ObjBoundMethod : public Obj
+{
+public:
+    ObjBoundMethod(Value receiver, ObjClosure * method)
+        : Obj(ObjType::BoundMethod)
+        , m_receiver(receiver)
+        , m_method(method)
+    {
+    }
+
+    constexpr static auto create(Value receiver, ObjClosure * method) -> ObjBoundMethod *
+    {
+        auto * obj = make_object<ObjBoundMethod>(receiver, method);
+        return obj;
+    }
+
+    [[nodiscard]] constexpr auto get_receiver() const -> Value { return m_receiver; }
+
+    [[nodiscard]] constexpr auto get_method() const -> ObjClosure * { return m_method; }
+
+private:
+    Value m_receiver;
+    ObjClosure * m_method;
+};
+
 // TODO: feels complicated that there are out-of-class definitions in a
 // completely separate module
 constexpr auto Value::string(std::string data) -> Value
@@ -358,6 +410,11 @@ constexpr auto Value::instance(ObjClass * cls) -> Value
     return {ValueType::Obj, {.obj = ObjInstance::create(cls)}};
 }
 
+constexpr auto Value::bound_method(Value receiver, ObjClosure * method) -> Value
+{
+    return {ValueType::Obj, {.obj = ObjBoundMethod::create(receiver, method)}};
+}
+
 constexpr auto Value::is_string() const -> bool
 {
     return value_is_obj_type<ObjType::String>(*this);
@@ -381,6 +438,11 @@ constexpr auto Value::is_closure() const -> bool
 constexpr auto Value::is_native() const -> bool
 {
     return value_is_obj_type<ObjType::Native>(*this);
+}
+
+constexpr auto Value::is_bound_method() const -> bool
+{
+    return value_is_obj_type<ObjType::BoundMethod>(*this);
 }
 
 constexpr auto Value::is_class() const -> bool { return value_is_obj_type<ObjType::Class>(*this); }
@@ -423,6 +485,11 @@ constexpr auto Value::as_objclass() const -> ObjClass *
 constexpr auto Value::as_objinstance() const -> ObjInstance *
 {
     return dynamic_cast<ObjInstance *>(as_obj());
+}
+
+constexpr auto Value::as_objboundmethod() const -> ObjBoundMethod *
+{
+    return dynamic_cast<ObjBoundMethod *>(as_obj());
 }
 
 constexpr auto Value::as_string() const -> const std::string & { return as_objstring()->data(); }
@@ -498,6 +565,13 @@ template <> struct std::formatter<cpplox::Value> : std::formatter<std::string_vi
                         "<class {} instance>",
                         value.as_objinstance()->get_class()->get_name()->data()
                 );
+            case cpplox::ObjType::BoundMethod: {
+                auto name = value.as_objboundmethod()->get_method()->get_function()->get_name();
+                if (name.empty()) {
+                    return std::format_to(ctx.out(), "<script>");
+                }
+                return std::format_to(ctx.out(), "<fn {}>", name);
+            }
             }
         }
     }
@@ -515,6 +589,7 @@ auto object_size(ObjType type) -> std::size_t
     case ObjType::Upvalue: return sizeof(ObjUpvalue);
     case ObjType::Class: return sizeof(ObjClass);
     case ObjType::Instance: return sizeof(ObjInstance);
+    case ObjType::BoundMethod: return sizeof(ObjBoundMethod);
     }
 }
 
@@ -579,6 +654,9 @@ auto blacken_object(Obj * obj) -> void
     case ObjType::Class: {
         auto * cls = dynamic_cast<ObjClass *>(obj);
         mark_object(cls->get_name());
+        for (const auto & [_, value] : cls->all_methods()) {
+            mark_value(value);
+        }
         break;
     }
     case ObjType::Instance: {
@@ -587,6 +665,12 @@ auto blacken_object(Obj * obj) -> void
         for (const auto & [_, value] : instance->all_fields()) {
             mark_value(value);
         }
+        break;
+    }
+    case ObjType::BoundMethod: {
+        auto * bound_method = dynamic_cast<ObjBoundMethod *>(obj);
+        mark_value(bound_method->get_receiver());
+        mark_object(bound_method->get_method());
         break;
     }
     }

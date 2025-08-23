@@ -22,6 +22,21 @@ auto constant(std::string_view name, const Chunk & chunk, std::size_t offset) ->
     return offset + 2;
 }
 
+auto invoke(std::string_view name, const Chunk & chunk, std::size_t offset) -> std::size_t
+{
+    Byte constant_idx = chunk.code[offset + 1];
+    Byte arg_count = chunk.code[offset + 2];
+
+    std::println(
+            "{:16} {:4} '{}' ({} args)",
+            name,
+            constant_idx,
+            chunk.constants[constant_idx],
+            arg_count
+    );
+    return offset + 3;
+}
+
 auto byte(std::string_view name, const Chunk & chunk, std::size_t offset) -> std::size_t
 {
     Byte slot = chunk.code[offset + 1];
@@ -113,6 +128,7 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case JumpIfFalse: return jump("OP_JUMP_IF_FALSE", /* forward = */ true, chunk, offset);
     case Loop: return jump("OP_LOOP", /* forward = */ false, chunk, offset);
     case Call: return byte("OP_CALL", chunk, offset);
+    case Invoke: return invoke("OP_INVOKE", chunk, offset);
     case Closure: {
         offset++;
         Byte constant = chunk.code[offset++];
@@ -130,6 +146,7 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     case CloseUpvalue: return simple("OP_CLOSE_UPVALUE", offset);
     case Return: return simple("OP_RETURN", offset);
     case Class: return constant("OP_CLASS", chunk, offset);
+    case Method: return constant("OP_METHOD", chunk, offset);
     }
 
     std::println("Unknown opcode {:x}", static_cast<Byte>(instruction));

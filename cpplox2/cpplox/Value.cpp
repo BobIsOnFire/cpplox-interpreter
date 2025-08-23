@@ -14,6 +14,7 @@ export class ObjClosure;
 export class ObjNative;
 export class ObjClass;
 export class ObjInstance;
+export class ObjBoundMethod;
 
 export enum class ValueType : std::uint8_t {
     Boolean,
@@ -70,6 +71,7 @@ public:
     static constexpr auto native(NativeFn) -> Value;
     static constexpr auto cls(ObjString *) -> Value;
     static constexpr auto instance(ObjClass *) -> Value;
+    static constexpr auto bound_method(Value, ObjClosure *) -> Value;
 
     // Casts
 
@@ -86,6 +88,7 @@ public:
     [[nodiscard]] constexpr auto as_objnative() const -> ObjNative *;
     [[nodiscard]] constexpr auto as_objclass() const -> ObjClass *;
     [[nodiscard]] constexpr auto as_objinstance() const -> ObjInstance *;
+    [[nodiscard]] constexpr auto as_objboundmethod() const -> ObjBoundMethod *;
 
     [[nodiscard]] constexpr auto as_string() const -> const std::string &;
     [[nodiscard]] constexpr auto as_native() const -> NativeFn;
@@ -106,6 +109,7 @@ public:
     [[nodiscard]] constexpr auto is_native() const -> bool;
     [[nodiscard]] constexpr auto is_class() const -> bool;
     [[nodiscard]] constexpr auto is_instance() const -> bool;
+    [[nodiscard]] constexpr auto is_bound_method() const -> bool;
 
     auto operator==(const Value & other) const -> bool;
 
