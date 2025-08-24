@@ -170,6 +170,7 @@ auto call_value(Value callee, Byte arg_count) -> bool
 
         if (arg_count != 0) {
             runtime_error("Expected 0 arguments but got {}.", arg_count);
+            return false;
         }
 
         return true;
