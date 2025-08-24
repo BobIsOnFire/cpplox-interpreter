@@ -80,6 +80,7 @@ struct Compiler
 
 struct ClassCompiler
 {
+    std::string_view name;
     ClassCompiler * enclosing = nullptr;
     bool has_superclass = false;
 };

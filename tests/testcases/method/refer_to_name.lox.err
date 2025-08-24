@@ -1,3 +1,3 @@
 runtime error: Undefined variable 'method'.
-  [3:11] in method()
+  [3:11] in Foo.method()
   [7:7] in script

@@ -183,9 +183,16 @@ auto emit_return() -> void
 auto init_compiler(Compiler & compiler, FunctionType type) -> void
 {
     compiler.enclosing = g_current_compiler;
-    compiler.function = ObjFunction::create(
-            std::string{type == FunctionType::Script ? "" : g_parser.previous.lexeme}
-    );
+
+    std::string name;
+    if (type == FunctionType::Function) {
+        name = g_parser.previous.lexeme;
+    }
+    else if (type == FunctionType::Method || type == FunctionType::Initializer) {
+        name = std::format("{}.{}", g_current_class->name, g_parser.previous.lexeme);
+    }
+
+    compiler.function = ObjFunction::create(std::move(name));
     compiler.type = type;
     compiler.locals.push_back({
             .name = {
@@ -703,7 +710,11 @@ auto class_declaration() -> void
     emit_bytes(OpCode::Class, name_constant);
     define_variable(name_constant);
 
-    ClassCompiler class_compiler{.enclosing = g_current_class, .has_superclass = false};
+    ClassCompiler class_compiler{
+            .name = class_name.lexeme,
+            .enclosing = g_current_class,
+            .has_superclass = false,
+    };
     g_current_class = &class_compiler;
 
     if (match(TokenType::Less)) {
