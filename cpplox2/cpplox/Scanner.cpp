@@ -238,7 +238,8 @@ auto number() -> Token
         advance();
     }
 
-    if (!is_at_end() && peek() == '.' && is_digit(peek_next())) {
+    if (g_scanner.current + 1 < g_scanner.source.length() && peek() == '.'
+        && is_digit(peek_next())) {
         advance(); // consume dot
         while (!is_at_end() && is_digit(peek())) {
             advance();
