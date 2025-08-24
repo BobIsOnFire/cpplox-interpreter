@@ -599,10 +599,14 @@ export auto init_vm() -> void
 
     define_native("clock", [](std::span<const Value> /* args */) {
         using namespace std::chrono;
+
+        constexpr static auto MS_IN_SECS = 1'000;
+
         return Value::number(
                 static_cast<double>(
-                        duration_cast<seconds>(system_clock::now().time_since_epoch()).count()
+                        duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count()
                 )
+                / MS_IN_SECS
         );
     });
 }
