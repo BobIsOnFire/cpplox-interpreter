@@ -72,6 +72,7 @@ export struct Scanner
     std::string_view source;
     std::size_t start;
     std::size_t current;
+    SourceLocation start_sloc;
     SourceLocation sloc;
 };
 
@@ -152,7 +153,7 @@ auto make_token(TokenType type) -> Token
     return Token{
             .type = type,
             .lexeme = get_lexeme(),
-            .sloc = g_scanner.sloc,
+            .sloc = g_scanner.start_sloc,
     };
 }
 
@@ -161,7 +162,7 @@ auto error_token(std::string_view message) -> Token
     return Token{
             .type = TokenType::Error,
             .lexeme = message,
-            .sloc = g_scanner.sloc,
+            .sloc = g_scanner.start_sloc,
     };
 }
 
@@ -263,6 +264,7 @@ export auto init_scanner(std::string_view source) -> void
     g_scanner.start = 0;
     g_scanner.current = 0;
 
+    g_scanner.start_sloc = {.line = 1, .column = 1};
     g_scanner.sloc = {.line = 1, .column = 1};
 }
 
@@ -273,6 +275,7 @@ export auto scan_token() -> Token
     skip_whitespace();
 
     g_scanner.start = g_scanner.current;
+    g_scanner.start_sloc = g_scanner.sloc;
     if (is_at_end()) {
         return make_token(EndOfFile);
     }
