@@ -1,1 +1,1 @@
-[line 2] Error at '=': Invalid assignment target.
+[2:5] Error at '=': Invalid assignment target.

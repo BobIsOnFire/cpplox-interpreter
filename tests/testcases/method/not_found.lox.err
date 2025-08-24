@@ -1,1 +1,2 @@
-[line 3] Undefined property 'unknown'.
+runtime error: Undefined property 'unknown'.
+  [3:7] in script

@@ -1,1 +1,1 @@
-[line 259] Error at 'a': Can't have more than 255 call arguments.
+[259:6] Error at 'a': Cannot have more than 255 arguments.

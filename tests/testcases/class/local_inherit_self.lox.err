@@ -1,1 +1,2 @@
-[line 2] Error at 'Foo': A class cannot inherit from itself.
+[2:15] Error at 'Foo': A class cannot inherit from itself.
+[5:1] Error at end: Expect '}' after block.

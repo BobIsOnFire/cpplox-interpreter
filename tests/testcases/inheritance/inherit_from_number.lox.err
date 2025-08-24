@@ -1,1 +1,2 @@
-[line 2] Superclass must be a class.
+runtime error: Superclass must be a class.
+  [2:1] in script

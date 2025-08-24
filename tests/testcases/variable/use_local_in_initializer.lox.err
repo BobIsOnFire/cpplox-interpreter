@@ -1,1 +1,1 @@
-[line 3] Error at 'a': Can't read local variable in its own initializer.
+[3:11] Error at 'a': Cannot read local variable in its own initializer.

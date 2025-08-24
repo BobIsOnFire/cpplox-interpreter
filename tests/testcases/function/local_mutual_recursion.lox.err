@@ -1,1 +1,3 @@
-[line 4] Undefined variable 'isOdd'.
+runtime error: Undefined variable 'isOdd'.
+  [4:12] in isEven()
+  [12:3] in script

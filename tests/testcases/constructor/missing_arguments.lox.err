@@ -1,1 +1,2 @@
-[line 5] Expected 2 arguments but got 1.
+runtime error: Expected 2 arguments but got 1.
+  [5:11] in script

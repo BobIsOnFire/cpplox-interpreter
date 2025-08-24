@@ -1,2 +1,2 @@
-[line 3] Error at '{': Expect expression.
-[line 3] Error at ')': Expect ';' after expression.
+[3:17] Error at '{': Expect expression.
+[3:30] Error at ')': Expect ';' after expression.

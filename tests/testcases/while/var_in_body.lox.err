@@ -1,1 +1,1 @@
-[line 2] Error at 'var': Expect expression.
+[2:14] Error at 'var': Expect expression.

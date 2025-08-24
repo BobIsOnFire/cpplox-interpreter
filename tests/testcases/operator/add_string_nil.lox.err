@@ -1,1 +1,2 @@
-[line 1] Operand must be string.
+runtime error: Operands must be two numbers or two strings.
+  [1:1] in script

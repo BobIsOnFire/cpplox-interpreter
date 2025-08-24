@@ -1,1 +1,2 @@
-[line 3] Error at '123': Expect '{' before function body.
+[3:9] Error at '123': Expect '{' before function body.
+[4:1] Error at end: Expect '}' after block.

@@ -1,1 +1,2 @@
-[line 4] Undefined property 'bar'.
+runtime error: Undefined property 'bar'.
+  [4:5] in script

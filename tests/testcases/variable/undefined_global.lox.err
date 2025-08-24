@@ -1,1 +1,2 @@
-[line 1] Undefined variable 'notDefined'.
+runtime error: Undefined variable 'notDefined'.
+  [1:7] in script

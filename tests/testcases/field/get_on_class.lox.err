@@ -1,1 +1,2 @@
-[line 2] Only objects have properties.
+runtime error: Only instances have properties.
+  [2:5] in script

@@ -1,1 +1,2 @@
-[line 6] Can only call functions and classes.
+runtime error: Can only call functions and classes.
+  [6:5] in script

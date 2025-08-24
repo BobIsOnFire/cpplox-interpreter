@@ -1,1 +1,1 @@
-[line 8] Error at ')': Expect '.' after 'super'.
+[8:11] Error at ')': Expect '.' after 'super'.
