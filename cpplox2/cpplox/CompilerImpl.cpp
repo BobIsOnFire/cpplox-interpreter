@@ -37,11 +37,11 @@ auto error_at(const Token & token, std::string_view message) -> void
     if (token.type == TokenType::EndOfFile) {
         std::print(std::cerr, " at end");
     }
-    else {
+    else if (token.type != TokenType::Error) {
         std::print(std::cerr, " at '{}'", token.lexeme);
     }
 
-    std::println(": {}", message);
+    std::println(std::cerr, ": {}", message);
 
     g_parser.had_error = true;
 }
@@ -265,7 +265,7 @@ auto resolve_local(Compiler * compiler, const Token & name) -> std::optional<std
          std::ranges::reverse_view{std::ranges::enumerate_view{compiler->locals}}) {
         if (local.name.lexeme == name.lexeme) {
             if (local.depth == -1) {
-                error("Can't read local variable in its own initializer.");
+                error("Cannot read local variable in its own initializer.");
             }
             return idx;
         }
@@ -500,7 +500,7 @@ auto variable(ParseContext ctx) -> void { named_variable(g_parser.previous, ctx)
 auto this_ex(ParseContext /* ctx */) -> void
 {
     if (g_current_class == nullptr) {
-        error("Can't use 'this' outside of a class.");
+        error("Cannot use 'this' outside of a class.");
     }
 
     variable({.can_assign = false});
@@ -531,10 +531,10 @@ auto call(ParseContext /* ctx */) -> void
 auto super_ex(ParseContext /* ctx */) -> void
 {
     if (g_current_class == nullptr) {
-        error("Can't use 'super' outside of a class.");
+        error("Cannot use 'super' outside of a class.");
     }
     else if (!g_current_class->has_superclass) {
-        error("Can't use 'super' in a class with no superclass.");
+        error("Cannot use 'super' in a class with no superclass.");
     }
 
     consume(TokenType::Dot, "Expect '.' after 'super'.");
@@ -618,7 +618,7 @@ auto print_statement() -> void
 auto return_statement() -> void
 {
     if (g_current_compiler->type == FunctionType::Script) {
-        error("Can't return from top-level code.");
+        error("Cannot return from top-level code.");
     }
 
     if (match(TokenType::Semicolon)) {
@@ -626,7 +626,7 @@ auto return_statement() -> void
     }
     else {
         if (g_current_compiler->type == FunctionType::Initializer) {
-            error("Can't return a value from initializer.");
+            error("Cannot return a value from initializer.");
         }
 
         expression();
@@ -663,7 +663,7 @@ auto function(FunctionType type) -> void
         do {
             g_current_compiler->function->arity()++;
             if (g_current_compiler->function->arity() > MAX_ARITY) {
-                error_at_current("Can't have more than 255 parameters.");
+                error_at_current("Cannot have more than 255 parameters.");
             }
             Byte constant = parse_variable("Expect parameter name.");
             define_variable(constant);
@@ -711,7 +711,7 @@ auto class_declaration() -> void
         variable({.can_assign = false});
 
         if (class_name.lexeme == g_parser.previous.lexeme) {
-            error("A class can't inherit from itself.");
+            error("A class cannot inherit from itself.");
         }
 
         begin_scope();

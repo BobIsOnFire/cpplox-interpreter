@@ -42,6 +42,7 @@ auto read_double_byte() -> DoubleByte
 
 template <typename... Args> auto runtime_error(std::format_string<Args...> fmt, Args &&... args)
 {
+    std::print(std::cerr, "runtime error: ");
     std::println(std::cerr, fmt, std::forward<Args>(args)...);
 
     for (const auto & frame : std::ranges::reverse_view{g_vm.frames}) {
@@ -51,7 +52,7 @@ template <typename... Args> auto runtime_error(std::format_string<Args...> fmt, 
         auto chunk_offset = static_cast<std::size_t>(std::distance(chunk.code.data(), frame.ip));
 
         const auto & location = chunk.locations[chunk_offset - 1];
-        std::print(std::cerr, "[{}:{}] in ", location.line, location.column);
+        std::print(std::cerr, "  [{}:{}] in ", location.line, location.column);
 
         if (function->get_name().empty()) {
             std::println(std::cerr, "script");
@@ -339,7 +340,7 @@ auto run() -> InterpretResult
             const std::string & name = read_constant().as_string();
             auto it = g_vm.globals.find(name);
             if (it == g_vm.globals.end()) {
-                runtime_error("Undefined variable '{}'", name);
+                runtime_error("Undefined variable '{}'.", name);
                 return InterpretResult::RuntimeError;
             }
             push_value(it->second);
@@ -390,7 +391,7 @@ auto run() -> InterpretResult
             const std::string & name = read_constant().as_string();
             auto it = g_vm.globals.find(name);
             if (it == g_vm.globals.end()) {
-                runtime_error("Undefined variable '{}'", name);
+                runtime_error("Undefined variable '{}'.", name);
                 return InterpretResult::RuntimeError;
             }
             it->second = peek_value();
@@ -460,7 +461,7 @@ auto run() -> InterpretResult
         case Not: push_value(Value::boolean(is_falsey(pop_value()))); break;
         case Negate:
             if (!peek_value().is_number()) {
-                runtime_error("Operator must be a number.");
+                runtime_error("Operand must be a number.");
                 return InterpretResult::RuntimeError;
             }
             push_value(Value::number(-pop_value().as_number()));
