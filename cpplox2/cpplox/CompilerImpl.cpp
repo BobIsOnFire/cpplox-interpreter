@@ -508,7 +508,7 @@ auto this_ex(ParseContext /* ctx */) -> void
 
 auto argument_list() -> Byte
 {
-    Byte arg_count = 0;
+    std::size_t arg_count = 0;
     if (!check(TokenType::RightParenthesis)) {
         do {
             expression();
@@ -519,7 +519,7 @@ auto argument_list() -> Byte
         } while (match(TokenType::Comma));
     }
     consume(TokenType::RightParenthesis, "Expect ')' after arguments.");
-    return arg_count;
+    return static_cast<Byte>(arg_count);
 }
 
 auto call(ParseContext /* ctx */) -> void
