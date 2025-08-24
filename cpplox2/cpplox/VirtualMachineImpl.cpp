@@ -50,7 +50,7 @@ template <typename... Args> auto runtime_error(std::format_string<Args...> fmt, 
         const auto & chunk = function->get_chunk();
         auto chunk_offset = static_cast<std::size_t>(std::distance(chunk.code.data(), frame.ip));
 
-        const auto & location = chunk.locations[chunk_offset];
+        const auto & location = chunk.locations[chunk_offset - 1];
         std::print(std::cerr, "[{}:{}] in ", location.line, location.column);
 
         if (function->get_name().empty()) {

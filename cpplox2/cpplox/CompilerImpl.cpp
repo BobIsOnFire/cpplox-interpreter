@@ -113,8 +113,8 @@ auto synchronize() -> void
 
 auto current_chunk() -> Chunk & { return g_current_compiler->function->get_chunk(); }
 
-auto emit_byte(Byte byte) -> void { write_chunk(current_chunk(), byte, g_parser.previous.sloc); }
-auto emit_byte(OpCode op) -> void { write_chunk(current_chunk(), op, g_parser.previous.sloc); }
+auto emit_byte(Byte byte) -> void { write_chunk(current_chunk(), byte, g_parser.op_sloc); }
+auto emit_byte(OpCode op) -> void { write_chunk(current_chunk(), op, g_parser.op_sloc); }
 
 template <typename ByteT, typename... Bytes> auto emit_bytes(ByteT byte, Bytes... bytes) -> void
 {
@@ -538,6 +538,10 @@ auto super_ex(ParseContext /* ctx */) -> void
     }
 
     consume(TokenType::Dot, "Expect '.' after 'super'.");
+
+    SourceLocation prev_op_sloc = g_parser.op_sloc;
+    g_parser.op_sloc = g_parser.current.sloc;
+
     consume(TokenType::Identifier, "Expect superclass method name.");
 
     Byte name = identifier_constant(g_parser.previous);
@@ -554,10 +558,15 @@ auto super_ex(ParseContext /* ctx */) -> void
         named_variable(synthetic_token("super"), {.can_assign = false});
         emit_bytes(OpCode::GetSuper, name);
     }
+
+    g_parser.op_sloc = prev_op_sloc;
 }
 
 auto dot(ParseContext ctx) -> void
 {
+    SourceLocation prev_op_sloc = g_parser.op_sloc;
+    g_parser.op_sloc = g_parser.current.sloc;
+
     consume(TokenType::Identifier, "Expect property name after '.'.");
     Byte name = identifier_constant(g_parser.previous);
 
@@ -573,6 +582,8 @@ auto dot(ParseContext ctx) -> void
     else {
         emit_bytes(OpCode::GetProperty, name);
     }
+
+    g_parser.op_sloc = prev_op_sloc;
 }
 
 // *** Statement Parser ***
@@ -834,6 +845,9 @@ auto for_statement() -> void
 
 auto statement() -> void
 {
+    SourceLocation prev_op_sloc = g_parser.op_sloc;
+    g_parser.op_sloc = g_parser.current.sloc;
+
     if (match(TokenType::Print)) {
         print_statement();
     }
@@ -857,10 +871,15 @@ auto statement() -> void
     else {
         expression_statement();
     }
+
+    g_parser.op_sloc = prev_op_sloc;
 }
 
 auto declaration() -> void
 {
+    SourceLocation prev_op_sloc = g_parser.op_sloc;
+    g_parser.op_sloc = g_parser.current.sloc;
+
     if (match(TokenType::Class)) {
         class_declaration();
     }
@@ -873,6 +892,9 @@ auto declaration() -> void
     else {
         statement();
     }
+
+    g_parser.op_sloc = prev_op_sloc;
+
     if (g_parser.panic_mode) {
         synchronize();
     }
@@ -933,6 +955,9 @@ auto get_rule(TokenType type) -> const ParseRule &
 
 auto parse_precedence(Precedence precedence) -> void
 {
+    SourceLocation prev_op_sloc = g_parser.op_sloc;
+    g_parser.op_sloc = g_parser.current.sloc;
+
     advance();
     auto prefix_rule = get_rule(g_parser.previous.type).prefix;
     if (prefix_rule == nullptr) {
@@ -949,6 +974,8 @@ auto parse_precedence(Precedence precedence) -> void
         assert(infix_rule != nullptr);
         infix_rule(ctx);
     }
+
+    g_parser.op_sloc = prev_op_sloc;
 
     if (ctx.can_assign && match(TokenType::Equal)) {
         error("Invalid assignment target.");

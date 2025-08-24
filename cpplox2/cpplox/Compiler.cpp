@@ -11,6 +11,7 @@ struct Parser
 {
     Token current;
     Token previous;
+    SourceLocation op_sloc;
     bool had_error = false;
     // TODO: prevents cascading errors, see error_at. Is there a better way to achieve this?
     bool panic_mode = false;
