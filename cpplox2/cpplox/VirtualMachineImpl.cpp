@@ -333,7 +333,13 @@ auto run() -> InterpretResult
             const std::string & name = read_constant().as_string();
             // FIXME: is there a way to get rid of copy on key insert? Key will surely live as long
             // as VM lives
-            g_vm.globals.emplace(name, peek_value());
+            auto it = g_vm.globals.find(name);
+            if (it != g_vm.globals.end()) {
+                it->second = peek_value();
+            }
+            else {
+                g_vm.globals.emplace(name, peek_value());
+            }
             pop_value();
             break;
         }
