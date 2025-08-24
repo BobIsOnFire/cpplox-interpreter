@@ -191,7 +191,7 @@ auto identifier_type() -> TokenType
             default: return Identifier;
             }
         }
-        break;
+        return Identifier;
     case 'i': return check_keyword("if", If);
     case 'n': return check_keyword("nil", Nil);
     case 'o': return check_keyword("or", Or);
@@ -206,7 +206,7 @@ auto identifier_type() -> TokenType
             default: return Identifier;
             }
         }
-        break;
+        return Identifier;
     case 'v': return check_keyword("var", Var);
     case 'w': return check_keyword("while", While);
     default: return Identifier;
