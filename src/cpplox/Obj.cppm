@@ -22,11 +22,6 @@ public:
     };
 
 public:
-    explicit Obj(ObjType type)
-        : m_type(type)
-    {
-    }
-
     virtual ~Obj() = default;
 
     [[nodiscard]] constexpr auto get_type() const -> ObjType { return m_type; }
@@ -35,6 +30,12 @@ public:
     constexpr auto mark() -> void { m_marked = true; }
     constexpr auto clear_mark() -> void { m_marked = false; }
     [[nodiscard]] constexpr auto is_marked() const -> bool { return m_marked; }
+
+protected:
+    explicit Obj(ObjType type)
+        : m_type(type)
+    {
+    }
 
 private:
     ObjType m_type;

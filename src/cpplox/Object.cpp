@@ -21,7 +21,7 @@ constexpr const std::size_t GC_HEAP_GROW_FACTOR = 2;
 auto object_size(Obj::ObjType type) -> std::size_t;
 auto collect_garbage() -> void;
 
-template <std::derived_from<Obj> T, typename... Args> auto make_object(Args &&... args) -> T *
+template <std::derived_from<Obj> T, typename... Args> auto save_object(T * obj) -> T *
 {
     if constexpr (DEBUG_RUN_GC_EVERY_TIME) {
         collect_garbage();
@@ -31,8 +31,6 @@ template <std::derived_from<Obj> T, typename... Args> auto make_object(Args &&..
         collect_garbage();
     }
 
-    T * obj = new T(std::forward<Args>(args)...); // NOLINT(cppcoreguidelines-owning-memory)
-
     if constexpr (DEBUG_LOG_GC) {
         std::println(
                 "Created {} at {}", magic_enum::enum_name(obj->get_type()), static_cast<void *>(obj)
@@ -40,7 +38,6 @@ template <std::derived_from<Obj> T, typename... Args> auto make_object(Args &&..
     }
 
     g_vm.objects.push_back(obj);
-
     g_vm.bytes_allocated += sizeof(T);
 
     return obj;
@@ -63,36 +60,50 @@ auto release_object(Obj * obj) -> void
 
 auto ObjString::create(std::string data) -> ObjString *
 {
-    return make_object<ObjString>(std::move(data));
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    return save_object(new ObjString(std::move(data)));
 }
 
 auto ObjUpvalue::create(Value * location) -> ObjUpvalue *
 {
-    return make_object<ObjUpvalue>(location);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    return save_object(new ObjUpvalue(location));
 }
 
 auto ObjFunction::create(std::string name) -> ObjFunction *
 {
-    return make_object<ObjFunction>(std::move(name));
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    return save_object(new ObjFunction(std::move(name)));
 }
 
 auto ObjNative::create(Value::NativeFn callable) -> ObjNative *
 {
-    return make_object<ObjNative>(callable);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    return save_object(new ObjNative(callable));
 }
 
 auto ObjClosure::create(ObjFunction * function) -> ObjClosure *
 {
-    return make_object<ObjClosure>(function);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    return save_object(new ObjClosure(function));
 }
 
-auto ObjClass::create(ObjString * name) -> ObjClass * { return make_object<ObjClass>(name); }
+auto ObjClass::create(ObjString * name) -> ObjClass *
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    return save_object(new ObjClass(name));
+}
 
-auto ObjInstance::create(ObjClass * cls) -> ObjInstance * { return make_object<ObjInstance>(cls); }
+auto ObjInstance::create(ObjClass * cls) -> ObjInstance *
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    return save_object(new ObjInstance(cls));
+}
 
 auto ObjBoundMethod::create(Value receiver, ObjClosure * method) -> ObjBoundMethod *
 {
-    return make_object<ObjBoundMethod>(receiver, method);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    return save_object(new ObjBoundMethod(receiver, method));
 }
 
 } // namespace cpplox
@@ -196,6 +207,7 @@ auto blacken_object(Obj * obj) -> void
     }
 }
 
+// TODO: do not run GC when compiling and hide Compiler struct within module
 auto mark_compiler_roots() -> void
 {
     Compiler * compiler = g_current_compiler;

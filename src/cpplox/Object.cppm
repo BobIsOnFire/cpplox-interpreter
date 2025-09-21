@@ -16,15 +16,15 @@ public:
     static auto create(std::string data) -> ObjString *;
 
 public:
+    [[nodiscard]] constexpr auto data() const -> const std::string & { return m_data; }
+
+private:
     explicit ObjString(std::string data)
         : Obj(ObjType::String)
         , m_data(std::move(data))
     {
     }
 
-    [[nodiscard]] constexpr auto data() const -> const std::string & { return m_data; }
-
-private:
     // TODO: Can we do a flexible array member for this to avoid double indirection?
     // See: ch. 19 challenges, https://en.wikipedia.org/wiki/Flexible_array_member
     std::string m_data;
@@ -36,13 +36,6 @@ public:
     static auto create(Value * location) -> ObjUpvalue *;
 
 public:
-    explicit ObjUpvalue(Value * location)
-        : Obj(ObjType::Upvalue)
-        , m_location(location)
-        , m_closed(Value::nil())
-    {
-    }
-
     [[nodiscard]] constexpr auto location() const -> Value * { return m_location; }
 
     constexpr auto set_next(ObjUpvalue * next) -> void { m_next = next; }
@@ -55,6 +48,13 @@ public:
     }
 
 private:
+    explicit ObjUpvalue(Value * location)
+        : Obj(ObjType::Upvalue)
+        , m_location(location)
+        , m_closed(Value::nil())
+    {
+    }
+
     Value * m_location;
     Value m_closed;
     ObjUpvalue * m_next = nullptr; // intrusive list
@@ -66,12 +66,6 @@ public:
     static auto create(std::string name) -> ObjFunction *;
 
 public:
-    explicit ObjFunction(std::string name)
-        : Obj(ObjType::Function)
-        , m_name(std::move(name))
-    {
-    }
-
     [[nodiscard]] constexpr auto get_name() const -> std::string_view { return m_name; }
 
     template <class Self> [[nodiscard]] auto get_chunk(this Self && self) -> auto &&
@@ -90,6 +84,12 @@ public:
     }
 
 private:
+    explicit ObjFunction(std::string name)
+        : Obj(ObjType::Function)
+        , m_name(std::move(name))
+    {
+    }
+
     std::size_t m_arity = 0;
     std::size_t m_upvalue_count = 0;
     Chunk m_chunk;
@@ -102,15 +102,15 @@ public:
     static auto create(Value::NativeFn callable) -> ObjNative *;
 
 public:
+    [[nodiscard]] constexpr auto get_callable() const -> Value::NativeFn { return m_callable; }
+
+private:
     explicit ObjNative(Value::NativeFn callable)
         : Obj(ObjType::Native)
         , m_callable(callable)
     {
     }
 
-    [[nodiscard]] constexpr auto get_callable() const -> Value::NativeFn { return m_callable; }
-
-private:
     Value::NativeFn m_callable;
 };
 
@@ -120,12 +120,6 @@ public:
     static auto create(ObjFunction * function) -> ObjClosure *;
 
 public:
-    explicit ObjClosure(ObjFunction * function)
-        : Obj(ObjType::Closure)
-        , m_function(function)
-    {
-    }
-
     [[nodiscard]] constexpr auto get_function() const -> ObjFunction * { return m_function; }
 
     constexpr auto add_upvalue(ObjUpvalue * upvalue) -> void { m_upvalues.push_back(upvalue); }
@@ -136,6 +130,12 @@ public:
     }
 
 private:
+    explicit ObjClosure(ObjFunction * function)
+        : Obj(ObjType::Closure)
+        , m_function(function)
+    {
+    }
+
     ObjFunction * m_function;
     std::vector<ObjUpvalue *> m_upvalues;
 };
@@ -146,12 +146,6 @@ public:
     static auto create(ObjString * name) -> ObjClass *;
 
 public:
-    explicit ObjClass(ObjString * name)
-        : Obj(ObjType::Class)
-        , m_name(name)
-    {
-    }
-
     [[nodiscard]] constexpr auto get_name() const -> ObjString * { return m_name; }
 
     [[nodiscard]] constexpr auto get_method(const std::string & name) -> std::optional<Value>
@@ -180,6 +174,12 @@ public:
     }
 
 private:
+    explicit ObjClass(ObjString * name)
+        : Obj(ObjType::Class)
+        , m_name(name)
+    {
+    }
+
     ObjString * m_name; // TODO: somehow use string_view into source code instead?
     std::unordered_map<std::string, Value> m_methods;
 };
@@ -190,12 +190,6 @@ public:
     static auto create(ObjClass * cls) -> ObjInstance *;
 
 public:
-    explicit ObjInstance(ObjClass * cls)
-        : Obj(ObjType::Instance)
-        , m_class(cls)
-    {
-    }
-
     [[nodiscard]] constexpr auto get_class() const -> ObjClass * { return m_class; }
 
     [[nodiscard]] constexpr auto get_field(const std::string & name) const -> std::optional<Value>
@@ -224,6 +218,12 @@ public:
     }
 
 private:
+    explicit ObjInstance(ObjClass * cls)
+        : Obj(ObjType::Instance)
+        , m_class(cls)
+    {
+    }
+
     ObjClass * m_class;
     std::unordered_map<std::string, Value> m_fields;
 };
@@ -234,6 +234,10 @@ public:
     static auto create(Value receiver, ObjClosure * method) -> ObjBoundMethod *;
 
 public:
+    [[nodiscard]] constexpr auto get_receiver() const -> Value { return m_receiver; }
+    [[nodiscard]] constexpr auto get_method() const -> ObjClosure * { return m_method; }
+
+private:
     ObjBoundMethod(Value receiver, ObjClosure * method)
         : Obj(ObjType::BoundMethod)
         , m_receiver(receiver)
@@ -241,11 +245,6 @@ public:
     {
     }
 
-    [[nodiscard]] constexpr auto get_receiver() const -> Value { return m_receiver; }
-
-    [[nodiscard]] constexpr auto get_method() const -> ObjClosure * { return m_method; }
-
-private:
     Value m_receiver;
     ObjClosure * m_method;
 };
