@@ -18,7 +18,7 @@ constexpr const bool DEBUG_RUN_GC_EVERY_TIME = false;
 constexpr const bool DEBUG_LOG_GC = false;
 constexpr const std::size_t GC_HEAP_GROW_FACTOR = 2;
 
-auto object_size(ObjType type) -> std::size_t;
+auto object_size(Obj::ObjType type) -> std::size_t;
 auto collect_garbage() -> void;
 
 template <std::derived_from<Obj> T, typename... Args> auto make_object(Args &&... args) -> T *
@@ -99,17 +99,17 @@ auto ObjBoundMethod::create(Value receiver, ObjClosure * method) -> ObjBoundMeth
 
 namespace cpplox { namespace {
 
-auto object_size(ObjType type) -> std::size_t
+auto object_size(Obj::ObjType type) -> std::size_t
 {
     switch (type) {
-    case ObjType::Closure: return sizeof(ObjClosure);
-    case ObjType::Function: return sizeof(ObjFunction);
-    case ObjType::Native: return sizeof(ObjNative);
-    case ObjType::String: return sizeof(ObjString);
-    case ObjType::Upvalue: return sizeof(ObjUpvalue);
-    case ObjType::Class: return sizeof(ObjClass);
-    case ObjType::Instance: return sizeof(ObjInstance);
-    case ObjType::BoundMethod: return sizeof(ObjBoundMethod);
+    case Obj::ObjType::Closure: return sizeof(ObjClosure);
+    case Obj::ObjType::Function: return sizeof(ObjFunction);
+    case Obj::ObjType::Native: return sizeof(ObjNative);
+    case Obj::ObjType::String: return sizeof(ObjString);
+    case Obj::ObjType::Upvalue: return sizeof(ObjUpvalue);
+    case Obj::ObjType::Class: return sizeof(ObjClass);
+    case Obj::ObjType::Instance: return sizeof(ObjInstance);
+    case Obj::ObjType::BoundMethod: return sizeof(ObjBoundMethod);
     }
 }
 
@@ -153,7 +153,7 @@ auto blacken_object(Obj * obj) -> void
 
     // TODO: definitely should be a virtual method in Obj classes
     switch (obj->get_type()) {
-    case ObjType::Closure: {
+    case Obj::ObjType::Closure: {
         auto * closure = dynamic_cast<ObjClosure *>(obj);
         mark_object(closure->get_function());
         for (const auto & value : closure->upvalues()) {
@@ -161,17 +161,17 @@ auto blacken_object(Obj * obj) -> void
         }
         break;
     }
-    case ObjType::Function: {
+    case Obj::ObjType::Function: {
         auto * function = dynamic_cast<ObjFunction *>(obj);
         for (const auto & value : function->get_chunk().constants) {
             mark_value(value);
         }
         break;
     }
-    case ObjType::Native:
-    case ObjType::String: break;
-    case ObjType::Upvalue: mark_value(*dynamic_cast<ObjUpvalue *>(obj)->location()); break;
-    case ObjType::Class: {
+    case Obj::ObjType::Native:
+    case Obj::ObjType::String: break;
+    case Obj::ObjType::Upvalue: mark_value(*dynamic_cast<ObjUpvalue *>(obj)->location()); break;
+    case Obj::ObjType::Class: {
         auto * cls = dynamic_cast<ObjClass *>(obj);
         mark_object(cls->get_name());
         for (const auto & [_, value] : cls->all_methods()) {
@@ -179,7 +179,7 @@ auto blacken_object(Obj * obj) -> void
         }
         break;
     }
-    case ObjType::Instance: {
+    case Obj::ObjType::Instance: {
         auto * instance = dynamic_cast<ObjInstance *>(obj);
         mark_object(instance->get_class());
         for (const auto & [_, value] : instance->all_fields()) {
@@ -187,7 +187,7 @@ auto blacken_object(Obj * obj) -> void
         }
         break;
     }
-    case ObjType::BoundMethod: {
+    case Obj::ObjType::BoundMethod: {
         auto * bound_method = dynamic_cast<ObjBoundMethod *>(obj);
         mark_value(bound_method->get_receiver());
         mark_object(bound_method->get_method());

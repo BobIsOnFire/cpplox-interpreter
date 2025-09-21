@@ -7,9 +7,8 @@ target_sources(cpplox
       cpplox/Compiler.cppm
       cpplox/Debug.cppm
       cpplox/EnumFormatter.cppm
+      cpplox/Obj.cppm
       cpplox/Object.cppm
-      cpplox/ObjectFwd.cppm
-      cpplox/ObjType.cppm
       cpplox/OpCode.cppm
       cpplox/Scanner.cppm
       cpplox/SourceLocation.cppm

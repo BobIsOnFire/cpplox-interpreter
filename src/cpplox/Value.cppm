@@ -3,7 +3,7 @@ export module cpplox:Value;
 import std;
 
 import :EnumFormatter;
-import :ObjectFwd;
+import :Obj;
 
 import magic_enum;
 

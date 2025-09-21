@@ -9,7 +9,7 @@ namespace cpplox {
 
 namespace {
 
-template <ObjType type> auto value_is_obj_type(Value value) -> bool
+template <Obj::ObjType type> auto value_is_obj_type(Value value) -> bool
 {
     return value.is_obj() && value.as_obj()->get_type() == type;
 }
@@ -56,24 +56,24 @@ auto Value::bound_method(Value receiver, ObjClosure * method) -> Value
     return {ValueType::Obj, {.obj = ObjBoundMethod::create(receiver, method)}};
 }
 
-auto Value::is_string() const -> bool { return value_is_obj_type<ObjType::String>(*this); }
+auto Value::is_string() const -> bool { return value_is_obj_type<Obj::ObjType::String>(*this); }
 
-auto Value::is_upvalue() const -> bool { return value_is_obj_type<ObjType::Upvalue>(*this); }
+auto Value::is_upvalue() const -> bool { return value_is_obj_type<Obj::ObjType::Upvalue>(*this); }
 
-auto Value::is_function() const -> bool { return value_is_obj_type<ObjType::Function>(*this); }
+auto Value::is_function() const -> bool { return value_is_obj_type<Obj::ObjType::Function>(*this); }
 
-auto Value::is_closure() const -> bool { return value_is_obj_type<ObjType::Closure>(*this); }
+auto Value::is_closure() const -> bool { return value_is_obj_type<Obj::ObjType::Closure>(*this); }
 
-auto Value::is_native() const -> bool { return value_is_obj_type<ObjType::Native>(*this); }
+auto Value::is_native() const -> bool { return value_is_obj_type<Obj::ObjType::Native>(*this); }
 
 auto Value::is_bound_method() const -> bool
 {
-    return value_is_obj_type<ObjType::BoundMethod>(*this);
+    return value_is_obj_type<Obj::ObjType::BoundMethod>(*this);
 }
 
-auto Value::is_class() const -> bool { return value_is_obj_type<ObjType::Class>(*this); }
+auto Value::is_class() const -> bool { return value_is_obj_type<Obj::ObjType::Class>(*this); }
 
-auto Value::is_instance() const -> bool { return value_is_obj_type<ObjType::Instance>(*this); }
+auto Value::is_instance() const -> bool { return value_is_obj_type<Obj::ObjType::Instance>(*this); }
 
 auto Value::as_objstring() const -> ObjString * { return dynamic_cast<ObjString *>(as_obj()); }
 
@@ -116,7 +116,7 @@ auto Value::operator==(const Value & other) const -> bool
     case ValueType::Number: return as_number() == other.as_number();
     case ValueType::Obj:
         switch (as_obj()->get_type()) {
-        case ObjType::String: return as_string() == other.as_string();
+        case Obj::ObjType::String: return as_string() == other.as_string();
         default: return as_obj() == other.as_obj();
         }
     }
@@ -136,33 +136,33 @@ auto std::formatter<cpplox::Value>::format(
         return std::format_to(ctx.out(), "{}", value.as_number());
     case cpplox::Value::ValueType::Obj:
         switch (value.as_obj()->get_type()) {
-        case cpplox::ObjType::String:
+        case cpplox::Obj::ObjType::String:
             return std::formatter<std::string_view>::format(value.as_string(), ctx);
-        case cpplox::ObjType::Upvalue: return std::format_to(ctx.out(), "upvalue");
-        case cpplox::ObjType::Function: {
+        case cpplox::Obj::ObjType::Upvalue: return std::format_to(ctx.out(), "upvalue");
+        case cpplox::Obj::ObjType::Function: {
             auto name = value.as_objfunction()->get_name();
             if (name.empty()) {
                 return std::format_to(ctx.out(), "<script>");
             }
             return std::format_to(ctx.out(), "<fn {}>", name);
         }
-        case cpplox::ObjType::Closure: {
+        case cpplox::Obj::ObjType::Closure: {
             auto name = value.as_objclosure()->get_function()->get_name();
             if (name.empty()) {
                 return std::format_to(ctx.out(), "<script>");
             }
             return std::format_to(ctx.out(), "<fn {}>", name);
         }
-        case cpplox::ObjType::Native: return std::format_to(ctx.out(), "<native fn>");
-        case cpplox::ObjType::Class:
+        case cpplox::Obj::ObjType::Native: return std::format_to(ctx.out(), "<native fn>");
+        case cpplox::Obj::ObjType::Class:
             return std::format_to(ctx.out(), "<class {}>", value.as_objclass()->get_name()->data());
-        case cpplox::ObjType::Instance:
+        case cpplox::Obj::ObjType::Instance:
             return std::format_to(
                     ctx.out(),
                     "<class {} instance>",
                     value.as_objinstance()->get_class()->get_name()->data()
             );
-        case cpplox::ObjType::BoundMethod: {
+        case cpplox::Obj::ObjType::BoundMethod: {
             auto name = value.as_objboundmethod()->get_method()->get_function()->get_name();
             if (name.empty()) {
                 return std::format_to(ctx.out(), "<script>");
