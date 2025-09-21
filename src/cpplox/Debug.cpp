@@ -1,4 +1,4 @@
-export module cpplox2:Debug;
+export module cpplox:Debug;
 
 import std;
 

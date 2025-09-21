@@ -1,4 +1,4 @@
-export module cpplox2:VirtualMachine;
+export module cpplox:VirtualMachine;
 
 import std;
 

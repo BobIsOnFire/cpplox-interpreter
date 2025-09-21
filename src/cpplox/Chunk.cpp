@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module cpplox2:Chunk;
+export module cpplox:Chunk;
 
 import std;
 

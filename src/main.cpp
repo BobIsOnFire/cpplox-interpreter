@@ -1,5 +1,5 @@
 import std;
-import cpplox2;
+import cpplox;
 
 namespace {
 

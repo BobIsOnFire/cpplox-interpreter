@@ -1,4 +1,4 @@
-export module cpplox2:Object;
+export module cpplox:Object;
 
 import :Compiler;
 import :Chunk;

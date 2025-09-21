@@ -1,4 +1,4 @@
-export module cpplox2:Value;
+export module cpplox:Value;
 
 import std;
 

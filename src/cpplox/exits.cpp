@@ -1,4 +1,4 @@
-export module cpplox2:exits;
+export module cpplox:exits;
 
 import std;
 

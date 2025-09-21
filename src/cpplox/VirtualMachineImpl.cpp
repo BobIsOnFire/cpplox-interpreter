@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module cpplox2:VirtualMachineImpl;
+export module cpplox:VirtualMachineImpl;
 
 import std;
 

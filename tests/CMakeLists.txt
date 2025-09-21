@@ -10,7 +10,7 @@ foreach(file IN LISTS TEST_FILES)
         NAME "${test_name}"
         COMMAND
             ${CMAKE_COMMAND} 
-            -DCPPLOX_EXE=$<TARGET_FILE:cpplox2-exe>
+            -DCPPLOX_EXE=$<TARGET_FILE:cpplox-exe>
             -DTEST_FILE=${file}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/testrunner.cmake"
     )

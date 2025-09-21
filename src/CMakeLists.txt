@@ -1,6 +1,6 @@
-add_library(cpplox2 STATIC)
+add_library(cpplox STATIC)
 
-target_sources(cpplox2
+target_sources(cpplox
   PUBLIC
     FILE_SET cxx_modules TYPE CXX_MODULES FILES
       cpplox/Chunk.cpp
@@ -19,12 +19,12 @@ target_sources(cpplox2
     BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-target_link_libraries(cpplox2 PRIVATE
+target_link_libraries(cpplox PRIVATE
   magic_enum-mod
 )
 
-add_executable(cpplox2-exe)
+add_executable(cpplox-exe)
 
-target_sources(cpplox2-exe PRIVATE main.cpp)
-target_link_libraries(cpplox2-exe PRIVATE cpplox2)
-set_property(TARGET cpplox2-exe PROPERTY OUTPUT_NAME cpplox2)
+target_sources(cpplox-exe PRIVATE main.cpp)
+target_link_libraries(cpplox-exe PRIVATE cpplox)
+set_property(TARGET cpplox-exe PROPERTY OUTPUT_NAME cpplox)

@@ -1,4 +1,4 @@
-export module cpplox2:SourceLocation;
+export module cpplox:SourceLocation;
 
 import std;
 

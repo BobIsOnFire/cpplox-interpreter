@@ -2,7 +2,7 @@ module;
 
 #include <cassert>
 
-export module cpplox2:CompilerImpl;
+export module cpplox:CompilerImpl;
 
 import std;
 

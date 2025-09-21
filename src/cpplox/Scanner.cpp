@@ -1,4 +1,4 @@
-export module cpplox2:Scanner;
+export module cpplox:Scanner;
 
 import std;
 

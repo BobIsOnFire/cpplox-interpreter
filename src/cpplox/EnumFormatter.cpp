@@ -1,4 +1,4 @@
-export module cpplox2:EnumFormatter;
+export module cpplox:EnumFormatter;
 
 import std;
 
