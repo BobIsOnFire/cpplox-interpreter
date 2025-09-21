@@ -14,7 +14,8 @@ Checks: >
     performance-*,
     readability-*,
     -readability-convert-member-functions-to-static,
-    -readability-identifier-length
+    -readability-identifier-length,
+    -readability-redundant-access-specifiers
 HeaderFilterRegex: '.'
 FormatStyle:     none
 User:            Linux

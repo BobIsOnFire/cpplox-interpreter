@@ -1,8 +1,9 @@
-export module cpplox:Debug;
+module cpplox;
 
 import std;
 
 import :Chunk;
+import :Debug;
 import :Object;
 
 namespace cpplox {
@@ -65,7 +66,7 @@ auto jump(std::string_view name, bool forward, const Chunk & chunk, std::size_t 
 
 } // namespace
 
-export auto print_stack(std::span<const Value> stack_view) -> void
+auto print_stack(std::span<const Value> stack_view) -> void
 {
     std::print("{:15}", ' ');
     if (stack_view.empty()) {
@@ -78,7 +79,7 @@ export auto print_stack(std::span<const Value> stack_view) -> void
     std::println();
 }
 
-export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> std::size_t
+auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> std::size_t
 {
     using enum OpCode;
 
@@ -156,7 +157,7 @@ export auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> 
     return offset + 1;
 }
 
-export auto disassemble_chunk(const Chunk & chunk, std::string_view chunk_name) -> void
+auto disassemble_chunk(const Chunk & chunk, std::string_view chunk_name) -> void
 {
     std::println("== {} ==", chunk_name);
 

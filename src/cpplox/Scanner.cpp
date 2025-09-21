@@ -1,80 +1,11 @@
-export module cpplox:Scanner;
+module cpplox;
 
 import std;
 
+import :Scanner;
 import :SourceLocation;
 
-import magic_enum;
-
 namespace cpplox {
-
-export enum class TokenType : std::uint8_t {
-    // Single-character tokens
-    LeftParenthesis,  // (
-    RightParenthesis, // )
-    LeftBrace,        // {
-    RightBrace,       // }
-    Comma,            // ,
-    Dot,              // .
-    Minus,            // -
-    Percent,          // %
-    Plus,             // +
-    Semicolon,        // ;
-    Slash,            // /
-    Star,             // *
-
-    // One or two character tokens
-    Bang,         // !
-    BangEqual,    // !=
-    Equal,        // =
-    EqualEqual,   // ==
-    Greater,      // >
-    GreaterEqual, // >=
-    Less,         // <
-    LessEqual,    // <=
-
-    // Literals
-    Identifier, // function names, variable names
-    String,     // "hello"
-    Number,     // 4, 10.01
-
-    // Keywords
-    And,
-    Class,
-    Else,
-    False,
-    Fun,
-    For,
-    If,
-    Nil,
-    Or,
-    Print,
-    Return,
-    Super,
-    This,
-    True,
-    Var,
-    While,
-
-    Error,
-    EndOfFile,
-};
-
-export struct Token
-{
-    TokenType type;
-    std::string_view lexeme; // TODO: lifetime checks?
-    SourceLocation sloc;
-};
-
-export struct Scanner
-{
-    std::string_view source;
-    std::size_t start;
-    std::size_t current;
-    SourceLocation start_sloc;
-    SourceLocation sloc;
-};
 
 // FIXME: get rid of singleton instance
 Scanner g_scanner; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
@@ -259,7 +190,7 @@ auto identifier() -> Token
 
 } // namespace
 
-export auto init_scanner(std::string_view source) -> void
+auto init_scanner(std::string_view source) -> void
 {
     g_scanner.source = source;
     g_scanner.start = 0;
@@ -269,7 +200,7 @@ export auto init_scanner(std::string_view source) -> void
     g_scanner.sloc = {.line = 1, .column = 1};
 }
 
-export auto scan_token() -> Token
+auto scan_token() -> Token
 {
     using enum TokenType;
 
@@ -312,11 +243,3 @@ export auto scan_token() -> Token
 }
 
 } // namespace cpplox
-
-template <> struct std::formatter<cpplox::TokenType> : std::formatter<std::string_view>
-{
-    auto format(const cpplox::TokenType & type, std::format_context & ctx) const
-    {
-        return std::formatter<std::string_view>::format(magic_enum::enum_name(type), ctx);
-    }
-};

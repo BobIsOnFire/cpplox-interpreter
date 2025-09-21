@@ -3,20 +3,28 @@ add_library(cpplox STATIC)
 target_sources(cpplox
   PUBLIC
     FILE_SET cxx_modules TYPE CXX_MODULES FILES
-      cpplox/Chunk.cpp
-      cpplox/Compiler.cpp
-      cpplox/CompilerImpl.cpp
-      cpplox/Debug.cpp
-      cpplox/EnumFormatter.cpp
-      cpplox/Object.cpp
-      cpplox/Scanner.cpp
-      cpplox/SourceLocation.cpp
-      cpplox/Value.cpp
-      cpplox/VirtualMachine.cpp
-      cpplox/VirtualMachineImpl.cpp
-      cpplox/exits.cpp
+      cpplox/Chunk.cppm
+      cpplox/Compiler.cppm
+      cpplox/Debug.cppm
+      cpplox/EnumFormatter.cppm
+      cpplox/Object.cppm
+      cpplox/ObjectFwd.cppm
+      cpplox/ObjType.cppm
+      cpplox/Scanner.cppm
+      cpplox/SourceLocation.cppm
+      cpplox/Value.cppm
+      cpplox/VirtualMachine.cppm
+      cpplox/exits.cppm
       cpplox.cppm
     BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}
+  PRIVATE
+    cpplox/Chunk.cpp
+    cpplox/Compiler.cpp
+    cpplox/Debug.cpp
+    cpplox/Object.cpp
+    cpplox/Scanner.cpp
+    cpplox/Value.cpp
+    cpplox/VirtualMachine.cpp
 )
 
 target_link_libraries(cpplox PRIVATE
