@@ -129,10 +129,12 @@ auto std::formatter<cpplox::Value>::format(
 ) const -> std::format_context::iterator
 {
     switch (value.get_type()) {
-    case cpplox::ValueType::Boolean: return std::format_to(ctx.out(), "{}", value.as_boolean());
-    case cpplox::ValueType::Nil: return std::format_to(ctx.out(), "nil");
-    case cpplox::ValueType::Number: return std::format_to(ctx.out(), "{}", value.as_number());
-    case cpplox::ValueType::Obj:
+    case cpplox::Value::ValueType::Boolean:
+        return std::format_to(ctx.out(), "{}", value.as_boolean());
+    case cpplox::Value::ValueType::Nil: return std::format_to(ctx.out(), "nil");
+    case cpplox::Value::ValueType::Number:
+        return std::format_to(ctx.out(), "{}", value.as_number());
+    case cpplox::Value::ValueType::Obj:
         switch (value.as_obj()->get_type()) {
         case cpplox::ObjType::String:
             return std::formatter<std::string_view>::format(value.as_string(), ctx);

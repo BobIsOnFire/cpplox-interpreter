@@ -10,6 +10,7 @@ import :Chunk;
 import :Compiler;
 import :Debug;
 import :Object;
+import :OpCode;
 import :Scanner;
 
 import magic_enum;
@@ -222,7 +223,7 @@ auto emit_constant(Value value) -> void { emit_bytes(OpCode::Constant, make_cons
 
 auto emit_return() -> void
 {
-    if (g_current_compiler->type == FunctionType::Initializer) {
+    if (g_current_compiler->type == Compiler::FunctionType::Initializer) {
         emit_bytes(OpCode::GetLocal, static_cast<Byte>(0));
     }
     else {
@@ -231,15 +232,16 @@ auto emit_return() -> void
     emit_byte(OpCode::Return);
 }
 
-auto init_compiler(Compiler & compiler, FunctionType type) -> void
+auto init_compiler(Compiler & compiler, Compiler::FunctionType type) -> void
 {
     compiler.enclosing = g_current_compiler;
 
     std::string name;
-    if (type == FunctionType::Function) {
+    if (type == Compiler::FunctionType::Function) {
         name = g_parser.previous.lexeme;
     }
-    else if (type == FunctionType::Method || type == FunctionType::Initializer) {
+    else if (type == Compiler::FunctionType::Method
+             || type == Compiler::FunctionType::Initializer) {
         name = std::format("{}.{}", g_current_class->name, g_parser.previous.lexeme);
     }
 
@@ -248,7 +250,7 @@ auto init_compiler(Compiler & compiler, FunctionType type) -> void
     compiler.locals.push_back({
             .name = {
                 .type = TokenType::EndOfFile,
-                .lexeme = type == FunctionType::Function ? "" : "this",
+                .lexeme = type == Compiler::FunctionType::Function ? "" : "this",
                 .sloc = {},
             },
             .depth = 0,
@@ -675,7 +677,7 @@ auto print_statement() -> void
 
 auto return_statement() -> void
 {
-    if (g_current_compiler->type == FunctionType::Script) {
+    if (g_current_compiler->type == Compiler::FunctionType::Script) {
         error("Cannot return from top-level code.");
     }
 
@@ -683,7 +685,7 @@ auto return_statement() -> void
         emit_return();
     }
     else {
-        if (g_current_compiler->type == FunctionType::Initializer) {
+        if (g_current_compiler->type == Compiler::FunctionType::Initializer) {
             error("Cannot return a value from initializer.");
         }
 
@@ -709,7 +711,7 @@ auto block() -> void
     consume(TokenType::RightBrace, "Expect '}' after block.");
 }
 
-auto function(FunctionType type) -> void
+auto function(Compiler::FunctionType type) -> void
 {
     Compiler compiler;
     init_compiler(compiler, type);
@@ -744,8 +746,8 @@ auto method() -> void
     consume(TokenType::Identifier, "Expect method name.");
     Byte constant = identifier_constant(g_parser.previous);
 
-    auto type
-            = g_parser.previous.lexeme == "init" ? FunctionType::Initializer : FunctionType::Method;
+    auto type = g_parser.previous.lexeme == "init" ? Compiler::FunctionType::Initializer
+                                                   : Compiler::FunctionType::Method;
     function(type);
 
     emit_bytes(OpCode::Method, constant);
@@ -806,7 +808,7 @@ auto fun_declaration() -> void
     Byte global = parse_variable("Expect function name.");
     mark_initialized();
 
-    function(FunctionType::Function);
+    function(Compiler::FunctionType::Function);
 
     define_variable(global);
 }
@@ -1050,7 +1052,7 @@ auto parse_precedence(Precedence precedence) -> void
 auto compile(std::string_view source) -> ObjFunction *
 {
     Compiler compiler;
-    init_compiler(compiler, FunctionType::Script);
+    init_compiler(compiler, Compiler::FunctionType::Script);
 
     init_scanner(source);
     advance();

@@ -1,6 +1,7 @@
 module cpplox;
 
 import :Chunk;
+import :OpCode;
 import :Value;
 
 namespace cpplox {

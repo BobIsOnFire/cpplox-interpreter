@@ -9,18 +9,19 @@ import magic_enum;
 
 namespace cpplox {
 
-export enum class ValueType : std::uint8_t {
-    Boolean,
-    Nil,
-    Number,
-    Obj,
-};
-
 // TODO: replace with std::variant?
 export class Value
 {
 public:
     using NativeFn = Value (*)(std::span<const Value>);
+
+    enum class ValueType : std::uint8_t
+    {
+        Boolean,
+        Nil,
+        Number,
+        Obj,
+    };
 
 private:
     union ValueData
@@ -107,7 +108,8 @@ private:
 
 } // namespace cpplox
 
-template <> struct std::formatter<cpplox::ValueType> : cpplox::EnumFormatter<cpplox::ValueType>
+template <>
+struct std::formatter<cpplox::Value::ValueType> : cpplox::EnumFormatter<cpplox::Value::ValueType>
 {
 };
 

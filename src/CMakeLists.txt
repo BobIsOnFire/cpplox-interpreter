@@ -10,8 +10,10 @@ target_sources(cpplox
       cpplox/Object.cppm
       cpplox/ObjectFwd.cppm
       cpplox/ObjType.cppm
+      cpplox/OpCode.cppm
       cpplox/Scanner.cppm
       cpplox/SourceLocation.cppm
+      cpplox/Token.cppm
       cpplox/Value.cppm
       cpplox/VirtualMachine.cppm
       cpplox/exits.cppm

@@ -9,6 +9,7 @@ import std;
 import :Compiler;
 import :Debug;
 import :Object;
+import :OpCode;
 import :VirtualMachine;
 
 namespace cpplox {

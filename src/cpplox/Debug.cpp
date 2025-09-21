@@ -5,6 +5,7 @@ import std;
 import :Chunk;
 import :Debug;
 import :Object;
+import :OpCode;
 
 namespace cpplox {
 
