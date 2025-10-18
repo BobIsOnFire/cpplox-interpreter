@@ -320,9 +320,10 @@ auto add_local(const Token & name) -> void
 
 auto resolve_local(Compiler * compiler, const Token & name) -> std::optional<std::size_t>
 {
-    // FIXME: UHH why `vector | views::enumerate | views::reverse` doesn't work??? libstdc++ wtf???
+    // FIXME: UHH why `vector | views::reverse` doesn't work??? libstdc++ wtf???
+    // TODO: use views::enumerate once it's available in libc++
     for (const auto & [idx, local] :
-         std::ranges::reverse_view{std::ranges::enumerate_view{compiler->locals}}) {
+         std::views::zip(std::views::iota(0UZ), compiler->locals) | std::views::reverse) {
         if (local.name.lexeme == name.lexeme) {
             if (local.depth == -1) {
                 error("Cannot read local variable in its own initializer.");
@@ -335,9 +336,10 @@ auto resolve_local(Compiler * compiler, const Token & name) -> std::optional<std
 
 auto add_upvalue(Compiler * compiler, Byte index, bool is_local) -> std::size_t
 {
-    for (const auto & [idx, upvalue] : std::ranges::enumerate_view(compiler->upvalues)) {
+    // TODO: use views::enumerate once it's available in libc++
+    for (const auto & [idx, upvalue] : std::views::zip(std::views::iota(0UZ), compiler->upvalues)) {
         if (upvalue.index == index && upvalue.is_local == is_local) {
-            return static_cast<std::size_t>(idx);
+            return idx;
         }
     }
 
