@@ -18,7 +18,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL Linux)
 endif()
 
 # Additional compile/link flags
-add_compile_options(-g)
+add_compile_options(-g -fmodules-reduced-bmi)
 include(cmake/ClangWarnings.cmake)
 include(cmake/Sanitizers.cmake)
 

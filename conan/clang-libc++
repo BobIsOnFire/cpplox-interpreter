@@ -2,3 +2,6 @@ include(clang)
 
 [settings]
 compiler.libcxx = libc++
+
+[conf]
+&:tools.build:exelinkflags = ['-Wl,-rpath,/home/nikitoss/llvm-21.1.3/lib/x86_64-unknown-linux-gnu']
