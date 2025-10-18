@@ -17,5 +17,6 @@ foreach(file IN LISTS TEST_FILES)
     set_property(TEST "${test_name}"
         PROPERTY ENVIRONMENT
             UBSAN_OPTIONS=print_stacktrace=1
+            LOX_DEBUG_RUN_GC_EVERY_TIME=1
     )
 endforeach()

@@ -17,7 +17,7 @@ namespace cpplox {
 namespace {
 constexpr const std::size_t FRAMES_MAX = 64;
 constexpr const std::size_t STACK_MAX = 256;
-constexpr const bool DEBUG_VM_EXECUTION = false;
+const bool DEBUG_VM_EXECUTION = std::getenv("LOX_DEBUG_VM_EXECUTION") != nullptr;
 } // namespace
 
 namespace {
@@ -309,7 +309,7 @@ auto run() -> InterpretResult
     for (;;) {
         InterpretResult op_result = InterpretResult::Ok;
 
-        if constexpr (DEBUG_VM_EXECUTION) {
+        if (DEBUG_VM_EXECUTION) [[unlikely]] {
             print_stack(g_vm.stack);
 
             const auto * chunk_start = current_chunk().code().data();

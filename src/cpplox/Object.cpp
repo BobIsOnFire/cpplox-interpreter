@@ -14,8 +14,8 @@ import magic_enum;
 namespace cpplox {
 
 namespace {
-constexpr const bool DEBUG_RUN_GC_EVERY_TIME = false;
-constexpr const bool DEBUG_LOG_GC = false;
+const bool DEBUG_RUN_GC_EVERY_TIME = std::getenv("LOX_DEBUG_RUN_GC_EVERY_TIME") != nullptr;
+const bool DEBUG_LOG_GC = std::getenv("LOX_DEBUG_LOG_GC") != nullptr;
 constexpr const std::size_t GC_HEAP_GROW_FACTOR = 2;
 
 auto object_size(Obj::ObjType type) -> std::size_t;
@@ -23,15 +23,11 @@ auto collect_garbage() -> void;
 
 template <std::derived_from<Obj> T, typename... Args> auto save_object(T * obj) -> T *
 {
-    if constexpr (DEBUG_RUN_GC_EVERY_TIME) {
+    if (DEBUG_RUN_GC_EVERY_TIME || g_vm.bytes_allocated >= g_vm.next_gc) {
         collect_garbage();
     }
 
-    if (g_vm.bytes_allocated >= g_vm.next_gc) {
-        collect_garbage();
-    }
-
-    if constexpr (DEBUG_LOG_GC) {
+    if (DEBUG_LOG_GC) [[unlikely]] {
         std::println(
                 std::cerr,
                 "Created {} at {}",
@@ -56,7 +52,7 @@ auto release_object(Obj * obj) -> void
 
     g_vm.bytes_allocated -= object_size(type);
 
-    if constexpr (DEBUG_LOG_GC) {
+    if (DEBUG_LOG_GC) [[unlikely]] {
         std::println(
                 std::cerr,
                 "Released {} at {}",
@@ -140,7 +136,7 @@ auto mark_object(Obj * obj) -> void
     if (obj->is_marked()) {
         return;
     }
-    if constexpr (DEBUG_LOG_GC) {
+    if (DEBUG_LOG_GC) [[unlikely]] {
         std::println(
                 std::cerr,
                 "Mark {} at {} ({})",
@@ -162,7 +158,7 @@ auto mark_value(const Value & value) -> void
 
 auto blacken_object(Obj * obj) -> void
 {
-    if constexpr (DEBUG_LOG_GC) {
+    if (DEBUG_LOG_GC) [[unlikely]] {
         std::println(
                 std::cerr,
                 "Blacken {} at {} ({})",
@@ -276,7 +272,7 @@ auto sweep() -> void
 
 auto collect_garbage() -> void
 {
-    if constexpr (DEBUG_LOG_GC) {
+    if (DEBUG_LOG_GC) [[unlikely]] {
         std::println(std::cerr, "-- gc begin");
     }
 
@@ -288,7 +284,7 @@ auto collect_garbage() -> void
 
     g_vm.next_gc = g_vm.bytes_allocated * GC_HEAP_GROW_FACTOR;
 
-    if constexpr (DEBUG_LOG_GC) {
+    if (DEBUG_LOG_GC) [[unlikely]] {
         std::println(std::cerr, "-- gc end");
         std::println(
                 std::cerr,
