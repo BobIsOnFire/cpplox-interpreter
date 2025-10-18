@@ -240,7 +240,7 @@ private:
     SourceLocation m_sloc = {.line = 1, .column = 1};
 };
 
-auto make_scanner(std::string_view source) -> std::unique_ptr<IScanner>
+auto make_scanner(std::string_view source) -> ScannerPtr
 {
     return std::make_unique<Scanner>(source);
 }

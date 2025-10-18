@@ -14,6 +14,8 @@ public:
     virtual auto next_token() -> Token = 0;
 };
 
-export auto make_scanner(std::string_view source) -> std::unique_ptr<IScanner>;
+export using ScannerPtr = std::unique_ptr<IScanner>;
+
+export auto make_scanner(std::string_view source) -> ScannerPtr;
 
 } // namespace cpplox
