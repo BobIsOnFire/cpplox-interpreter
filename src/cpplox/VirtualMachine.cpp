@@ -291,10 +291,8 @@ auto define_method(const std::string & name) -> void
 auto define_native(std::string_view name, Value::NativeFn callable) -> void
 {
     // pushing and popping some GC bullsheesh
-    push_value(Value::string(std::string{name}));
     push_value(Value::native(callable));
     g_vm.globals.emplace(name, g_vm.stack.back());
-    pop_value();
     pop_value();
 }
 
@@ -626,6 +624,8 @@ auto interpret(std::string_view source) -> InterpretResult
     if (function == nullptr) {
         return InterpretResult::CompileError;
     }
+
+    g_vm.gc_active = true;
 
     // FIXME: hack. Should use arrays inside VM object instead.
     g_vm.frames.reserve(FRAMES_MAX);

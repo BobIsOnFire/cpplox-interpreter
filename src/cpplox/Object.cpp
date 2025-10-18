@@ -23,8 +23,10 @@ auto collect_garbage() -> void;
 
 template <std::derived_from<Obj> T, typename... Args> auto save_object(T * obj) -> T *
 {
-    if (DEBUG_RUN_GC_EVERY_TIME || g_vm.bytes_allocated >= g_vm.next_gc) {
-        collect_garbage();
+    if (g_vm.gc_active) {
+        if (DEBUG_RUN_GC_EVERY_TIME || g_vm.bytes_allocated >= g_vm.next_gc) {
+            collect_garbage();
+        }
     }
 
     if (DEBUG_LOG_GC) [[unlikely]] {
@@ -213,16 +215,6 @@ auto blacken_object(Obj * obj) -> void
     }
 }
 
-// TODO: do not run GC when compiling and hide Compiler struct within module
-auto mark_compiler_roots() -> void
-{
-    Compiler * compiler = g_current_compiler;
-    while (compiler != nullptr) {
-        mark_object(compiler->function);
-        compiler = compiler->enclosing;
-    }
-}
-
 auto mark_roots() -> void
 {
     for (const auto & value : g_vm.stack) {
@@ -240,8 +232,6 @@ auto mark_roots() -> void
     for (const auto & [_, value] : g_vm.globals) {
         mark_value(value);
     }
-
-    mark_compiler_roots();
 }
 
 auto trace_references() -> void

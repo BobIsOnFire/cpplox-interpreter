@@ -26,6 +26,7 @@ export struct VirtualMachine
     std::unordered_set<Obj *> gray_objects; // gray-marked
     std::size_t bytes_allocated = 0;
     std::size_t next_gc = 1024 * 1024;
+    bool gc_active = false;
 };
 
 // TODO: make this store error only, and use std::expected<std::monostate, InterpretError> for this
