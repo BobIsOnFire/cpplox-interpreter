@@ -7,16 +7,13 @@ import :Token;
 
 namespace cpplox {
 
-export struct Scanner
+export class IScanner
 {
-    std::string_view source;
-    std::size_t start;
-    std::size_t current;
-    SourceLocation start_sloc;
-    SourceLocation sloc;
+public:
+    virtual ~IScanner() = default;
+    virtual auto next_token() -> Token = 0;
 };
 
-export auto init_scanner(std::string_view source) -> void;
-export auto scan_token() -> Token;
+export auto make_scanner(std::string_view source) -> std::unique_ptr<IScanner>;
 
 } // namespace cpplox

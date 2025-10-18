@@ -31,6 +31,7 @@ struct Compiler
     };
 
     Compiler * enclosing = nullptr;
+    IScanner * scanner = nullptr;
     ObjFunction * function = nullptr;
     FunctionType type = FunctionType::Script;
 

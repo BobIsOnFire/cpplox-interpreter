@@ -106,7 +106,7 @@ auto advance() -> void
     g_parser.previous = g_parser.current;
 
     for (;;) {
-        g_parser.current = scan_token();
+        g_parser.current = g_current_compiler->scanner->next_token();
         if (g_parser.current.type != TokenType::Error) {
             break;
         }
@@ -232,8 +232,9 @@ auto emit_return() -> void
     emit_byte(OpCode::Return);
 }
 
-auto init_compiler(Compiler & compiler, Compiler::FunctionType type) -> void
+auto init_compiler(Compiler & compiler, IScanner * scanner, Compiler::FunctionType type) -> void
 {
+    compiler.scanner = scanner;
     compiler.enclosing = g_current_compiler;
 
     std::string name;
@@ -716,7 +717,7 @@ auto block() -> void
 auto function(Compiler::FunctionType type) -> void
 {
     Compiler compiler;
-    init_compiler(compiler, type);
+    init_compiler(compiler, g_current_compiler->scanner, type);
 
     begin_scope();
 
@@ -1053,10 +1054,11 @@ auto parse_precedence(Precedence precedence) -> void
 // TODO: should denote failure, replace with std::expected
 auto compile(std::string_view source) -> ObjFunction *
 {
-    Compiler compiler;
-    init_compiler(compiler, Compiler::FunctionType::Script);
+    std::unique_ptr<IScanner> scanner = make_scanner(source);
 
-    init_scanner(source);
+    Compiler compiler;
+    init_compiler(compiler, scanner.get(), Compiler::FunctionType::Script);
+
     advance();
 
     while (!match(TokenType::EndOfFile)) {
