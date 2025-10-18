@@ -33,7 +33,10 @@ template <std::derived_from<Obj> T, typename... Args> auto save_object(T * obj) 
 
     if constexpr (DEBUG_LOG_GC) {
         std::println(
-                "Created {} at {}", magic_enum::enum_name(obj->get_type()), static_cast<void *>(obj)
+                std::cerr,
+                "Created {} at {}",
+                magic_enum::enum_name(obj->get_type()),
+                static_cast<void *>(obj)
         );
     }
 
@@ -54,7 +57,12 @@ auto release_object(Obj * obj) -> void
     g_vm.bytes_allocated -= object_size(type);
 
     if constexpr (DEBUG_LOG_GC) {
-        std::println("Released {} at {}", magic_enum::enum_name(type), static_cast<void *>(obj));
+        std::println(
+                std::cerr,
+                "Released {} at {}",
+                magic_enum::enum_name(type),
+                static_cast<void *>(obj)
+        );
     }
 }
 
@@ -134,6 +142,7 @@ auto mark_object(Obj * obj) -> void
     }
     if constexpr (DEBUG_LOG_GC) {
         std::println(
+                std::cerr,
                 "Mark {} at {} ({})",
                 magic_enum::enum_name(obj->get_type()),
                 static_cast<void *>(obj),
@@ -155,6 +164,7 @@ auto blacken_object(Obj * obj) -> void
 {
     if constexpr (DEBUG_LOG_GC) {
         std::println(
+                std::cerr,
                 "Blacken {} at {} ({})",
                 magic_enum::enum_name(obj->get_type()),
                 static_cast<void *>(obj),
@@ -267,7 +277,7 @@ auto sweep() -> void
 auto collect_garbage() -> void
 {
     if constexpr (DEBUG_LOG_GC) {
-        std::println("-- gc begin");
+        std::println(std::cerr, "-- gc begin");
     }
 
     std::size_t before = g_vm.bytes_allocated;
@@ -279,8 +289,9 @@ auto collect_garbage() -> void
     g_vm.next_gc = g_vm.bytes_allocated * GC_HEAP_GROW_FACTOR;
 
     if constexpr (DEBUG_LOG_GC) {
-        std::println("-- gc end");
+        std::println(std::cerr, "-- gc end");
         std::println(
+                std::cerr,
                 "   collected {} bytes (from {} to {}), next gc at {}",
                 before - g_vm.bytes_allocated,
                 before,

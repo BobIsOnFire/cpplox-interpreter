@@ -13,14 +13,14 @@ namespace {
 
 auto simple(std::string_view name, std::size_t offset) -> std::size_t
 {
-    std::println("{}", name);
+    std::println(std::cerr, "{}", name);
     return offset + 1;
 }
 
 auto constant(std::string_view name, const Chunk & chunk, std::size_t offset) -> std::size_t
 {
     Byte constant_idx = chunk.code()[offset + 1];
-    std::println("{:16} {:4} '{}'", name, constant_idx, chunk.constants()[constant_idx]);
+    std::println(std::cerr, "{:16} {:4} '{}'", name, constant_idx, chunk.constants()[constant_idx]);
     return offset + 2;
 }
 
@@ -30,6 +30,7 @@ auto invoke(std::string_view name, const Chunk & chunk, std::size_t offset) -> s
     Byte arg_count = chunk.code()[offset + 2];
 
     std::println(
+            std::cerr,
             "{:16} {:4} '{}' ({} args)",
             name,
             constant_idx,
@@ -42,7 +43,7 @@ auto invoke(std::string_view name, const Chunk & chunk, std::size_t offset) -> s
 auto byte(std::string_view name, const Chunk & chunk, std::size_t offset) -> std::size_t
 {
     Byte slot = chunk.code()[offset + 1];
-    std::println("{:16} {:4}", name, slot);
+    std::println(std::cerr, "{:16} {:4}", name, slot);
     return offset + 2;
 }
 
@@ -60,7 +61,7 @@ auto jump(std::string_view name, bool forward, const Chunk & chunk, std::size_t 
         jump_to -= jump_length;
     }
 
-    std::println("{:16} {:4} -> {}", name, offset, jump_to);
+    std::println(std::cerr, "{:16} {:4} -> {}", name, offset, jump_to);
 
     return offset + 3;
 }
@@ -69,28 +70,28 @@ auto jump(std::string_view name, bool forward, const Chunk & chunk, std::size_t 
 
 auto print_stack(std::span<const Value> stack_view) -> void
 {
-    std::print("{:15}", ' ');
+    std::print(std::cerr, "{:15}", ' ');
     if (stack_view.empty()) {
-        std::println("<stack empty>");
+        std::println(std::cerr, "<stack empty>");
         return;
     }
     for (const auto & value : stack_view) {
-        std::print("[ {} ]", value);
+        std::print(std::cerr, "[ {} ]", value);
     }
-    std::println();
+    std::println(std::cerr);
 }
 
 auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> std::size_t
 {
     using enum OpCode;
 
-    std::print("{:04} ", offset);
+    std::print(std::cerr, "{:04} ", offset);
     auto sloc = chunk.locations()[offset];
     if (offset > 0 && sloc.line == chunk.locations()[offset - 1].line) {
-        std::print("{:>4}:{:<4} ", '|', sloc.column);
+        std::print(std::cerr, "{:>4}:{:<4} ", '|', sloc.column);
     }
     else {
-        std::print("{:>4}:{:<4} ", sloc.line, sloc.column);
+        std::print(std::cerr, "{:>4}:{:<4} ", sloc.line, sloc.column);
     }
 
     auto instruction = static_cast<OpCode>(chunk.code()[offset]);
@@ -136,14 +137,18 @@ auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> std::si
     case Closure: {
         offset++;
         Byte constant = chunk.code()[offset++];
-        std::println("{:16} {:4} {}", "OP_CLOSURE", constant, chunk.constants()[constant]);
+        std::println(
+                std::cerr, "{:16} {:4} {}", "OP_CLOSURE", constant, chunk.constants()[constant]
+        );
 
         auto * function = chunk.constants()[constant].as_objfunction();
         for (auto _ : std::views::iota(0UZ, function->upvalue_count())) {
             bool is_local = chunk.code()[offset++] == 1;
             Byte index = chunk.code()[offset++];
-            std::print("{:04} {:>4} {:<4} ", offset - 2, ' ', ' ');
-            std::println("{:16} {:4} {} {}", '|', ' ', is_local ? "local" : "upvalue", index);
+            std::print(std::cerr, "{:04} {:>4} {:<4} ", offset - 2, ' ', ' ');
+            std::println(
+                    std::cerr, "{:16} {:4} {} {}", '|', ' ', is_local ? "local" : "upvalue", index
+            );
         }
         return offset;
     }
@@ -154,13 +159,13 @@ auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> std::si
     case Method: return constant("OP_METHOD", chunk, offset);
     }
 
-    std::println("Unknown opcode {:x}", static_cast<Byte>(instruction));
+    std::println(std::cerr, "Unknown opcode {:x}", static_cast<Byte>(instruction));
     return offset + 1;
 }
 
 auto disassemble_chunk(const Chunk & chunk, std::string_view chunk_name) -> void
 {
-    std::println("== {} ==", chunk_name);
+    std::println(std::cerr, "== {} ==", chunk_name);
 
     for (std::size_t offset = 0; offset < chunk.code().size();) {
         offset = disassemble_instruction(chunk, offset);
