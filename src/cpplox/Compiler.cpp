@@ -19,7 +19,7 @@ namespace cpplox {
 
 namespace {
 constexpr const std::size_t MAX_ARITY = 255;
-constexpr const bool DEBUG_PRINT_CODE = false;
+const bool DEBUG_PRINT_CODE = std::getenv("LOX_DEBUG_PRINT_CODE") != nullptr;
 } // namespace
 
 struct Parser
@@ -265,7 +265,7 @@ auto end_compiler() -> ObjFunction *
 {
     emit_return();
     auto * function = g_current_compiler->function;
-    if constexpr (DEBUG_PRINT_CODE) {
+    if (DEBUG_PRINT_CODE) [[unlikely]] {
         if (!g_parser.had_error) {
             auto name = function->get_name();
             disassemble_chunk(current_chunk(), name.empty() ? "<script>" : name);
