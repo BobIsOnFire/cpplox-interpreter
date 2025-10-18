@@ -29,6 +29,7 @@ target_sources(cpplox
 )
 
 target_link_libraries(cpplox PRIVATE
+  Boost::headers # for Boost.Preprocessor
   magic_enum-mod
 )
 

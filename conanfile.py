@@ -20,6 +20,7 @@ class HelloConan(ConanFile):
         cmake_layout(self)
 
     def requirements(self):
+        self.requires("boost/1.88.0")
         self.requires("magic_enum/0.9.7")
         self.requires("yaml-cpp/0.8.0")
         self.requires("gtest/1.12.1", test=True)

@@ -1,5 +1,7 @@
 module;
 
+#include <boost/preprocessor.hpp>
+
 #include <cassert>
 
 module cpplox;
@@ -1080,39 +1082,18 @@ private:
         using enum Precedence;
         std::array<ParseRule, magic_enum::enum_values<TokenType>().size()> rules;
 
-// TODO: replace with Boost.Preprocessor
-// clang-format off
-// NOLINTBEGIN(cppcoreguidelines-macro-usage)
-#define CAT(a, b) a##b
+        // clang-format off
 
-#define FIRST_ARG(arg1, ...) arg1
-#define SECOND_ARG(arg1, arg2, ...) arg2
+        // NOLINTBEGIN(cppcoreguidelines-macro-usage)
+        #define _IS_NULLPTR_CHECK_nullptr // Empty macro to assist with CHECK_EMPTY below
+        #define IS_NULLPTR(val) BOOST_PP_CHECK_EMPTY(_IS_NULLPTR_CHECK_ ## val)
 
-#define PROBE() ~, 1
-#define IS_PROBE(...) SECOND_ARG(__VA_ARGS__, 0)
-
-#define _NOT_0 PROBE()
-#define NOT(x) IS_PROBE(CAT(_NOT_, x))
-
-#define BOOL(x) NOT(NOT(x))
-
-#define _IF_1(...) __VA_ARGS__ _IF_1_ELSE
-#define _IF_0(...) _IF_0_ELSE
-#define _IF_1_ELSE(...)
-#define _IF_0_ELSE(...) __VA_ARGS__
-#define _IF_ELSE(cond) CAT(_IF_, cond)
-#define IF_ELSE(cond) _IF_ELSE(BOOL(cond))
-
-#define _IS_VALUE_nullptr() 0
-#define IS_VALUE(val) CAT(_IS_VALUE_, val)()
-
-#define ADD_RULE(token_type, prefix_val, infix_val, precendence_val)                               \
-    rules[static_cast<std::size_t>(TokenType::token_type)] = {                                     \
-            .prefix = IF_ELSE(IS_VALUE(prefix_val))(&Compiler::prefix_val)(nullptr),               \
-            .infix = IF_ELSE(IS_VALUE(infix_val))(&Compiler::infix_val)(nullptr),                  \
-            .precedence = (Precedence::precendence_val),                                           \
-    }
-// NOLINTEND(cppcoreguidelines-macro-usage)
+        #define ADD_RULE(token_type, prefix_val, infix_val, precendence_val)                       \
+            rules[static_cast<std::size_t>(TokenType::token_type)] = {                             \
+                    .prefix = BOOST_PP_IIF(IS_NULLPTR(prefix_val), nullptr, &Compiler::prefix_val),\
+                    .infix = BOOST_PP_IIF(IS_NULLPTR(infix_val), nullptr, &Compiler::infix_val),   \
+                    .precedence = Precedence::precendence_val,                                     \
+            }
 
         //       Token type     | Prefix fn | Infix fn | Precedence 
         ADD_RULE(And,             nullptr,    and_ex,    And);
@@ -1139,9 +1120,10 @@ private:
         ADD_RULE(This,            this_ex,    nullptr,   None);
         ADD_RULE(True,            literal,    nullptr,   None);
 
-#undef _IS_VALUE_nullptr
-#undef IS_VALUE
-#undef ADD_RULE
+        #undef _IS_NULLPTR_CHECK_nullptr
+        #undef IS_NULLPTR
+        #undef ADD_RULE
+        // NOLINTEND(cppcoreguidelines-macro-usage)
 
         // clang-format on
 

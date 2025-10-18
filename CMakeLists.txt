@@ -22,6 +22,8 @@ add_compile_options(-g -fmodules-reduced-bmi)
 include(cmake/ClangWarnings.cmake)
 include(cmake/Sanitizers.cmake)
 
+find_package(Boost CONFIG REQUIRED)
+
 add_subdirectory(thd-modules)
 
 add_subdirectory(src)
