@@ -165,8 +165,8 @@ auto synchronize() -> void
 
 auto current_chunk() -> Chunk & { return g_current_compiler->function->get_chunk(); }
 
-auto emit_byte(Byte byte) -> void { write_chunk(current_chunk(), byte, g_parser.op_sloc); }
-auto emit_byte(OpCode op) -> void { write_chunk(current_chunk(), op, g_parser.op_sloc); }
+auto emit_byte(Byte byte) -> void { current_chunk().write(byte, g_parser.op_sloc); }
+auto emit_byte(OpCode op) -> void { current_chunk().write(op, g_parser.op_sloc); }
 
 template <typename ByteT, typename... Bytes> auto emit_bytes(ByteT byte, Bytes... bytes) -> void
 {
@@ -180,7 +180,7 @@ auto emit_loop(std::size_t start) -> void
 {
     emit_byte(OpCode::Loop);
 
-    std::size_t offset = current_chunk().code.size() - start + 2;
+    std::size_t offset = current_chunk().code().size() - start + 2;
     if (offset > DOUBLE_BYTE_MAX) {
         error("Loop body too large.");
     }
@@ -193,24 +193,24 @@ auto emit_jump(OpCode instruction) -> std::size_t
 {
     emit_bytes(instruction, BYTE_MAX, BYTE_MAX);
 
-    return current_chunk().code.size() - 2;
+    return current_chunk().code().size() - 2;
 }
 
 auto patch_jump(std::size_t offset) -> void
 {
-    std::size_t jump_length = current_chunk().code.size() - offset - 2;
+    std::size_t jump_length = current_chunk().code().size() - offset - 2;
 
     if (jump_length > DOUBLE_BYTE_MAX) {
         error("Too much code to jump over.");
     }
 
-    current_chunk().code[offset] = (jump_length >> BYTE_DIGITS) & BYTE_MAX;
-    current_chunk().code[offset + 1] = jump_length & BYTE_MAX;
+    current_chunk().code()[offset] = (jump_length >> BYTE_DIGITS) & BYTE_MAX;
+    current_chunk().code()[offset + 1] = jump_length & BYTE_MAX;
 }
 
 auto make_constant(Value value) -> Byte
 {
-    std::size_t c = add_constant(current_chunk(), value);
+    std::size_t c = current_chunk().add_constant(value);
     if (c >= BYTE_MAX) {
         error("Too many constants in one chunk.");
         return 0;
@@ -840,7 +840,7 @@ auto if_statement() -> void
 
 auto while_statement() -> void
 {
-    std::size_t loop_start = current_chunk().code.size();
+    std::size_t loop_start = current_chunk().code().size();
 
     consume(TokenType::LeftParenthesis, "Expect '(' after 'while'.");
     expression();
@@ -873,7 +873,7 @@ auto for_statement() -> void
         expression_statement();
     }
 
-    std::size_t loop_start = current_chunk().code.size();
+    std::size_t loop_start = current_chunk().code().size();
 
     std::optional<std::size_t> exit_jump;
     if (!match(TokenType::Semicolon)) {
@@ -886,7 +886,7 @@ auto for_statement() -> void
 
     if (!match(TokenType::RightParenthesis)) {
         std::size_t body_jump = emit_jump(OpCode::Jump);
-        std::size_t increment_start = current_chunk().code.size();
+        std::size_t increment_start = current_chunk().code().size();
 
         expression();
 

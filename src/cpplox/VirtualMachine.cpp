@@ -34,7 +34,7 @@ auto read_byte() -> Byte
 
 auto read_instruction() -> OpCode { return static_cast<OpCode>(read_byte()); }
 
-auto read_constant() -> Value { return current_chunk().constants[read_byte()]; }
+auto read_constant() -> Value { return current_chunk().constants()[read_byte()]; }
 
 auto read_double_byte() -> DoubleByte
 {
@@ -50,9 +50,9 @@ template <typename... Args> auto runtime_error(std::format_string<Args...> fmt, 
         const auto * function = frame.closure->get_function();
 
         const auto & chunk = function->get_chunk();
-        auto chunk_offset = static_cast<std::size_t>(std::distance(chunk.code.data(), frame.ip));
+        auto chunk_offset = static_cast<std::size_t>(std::distance(chunk.code().data(), frame.ip));
 
-        const auto & location = chunk.locations[chunk_offset - 1];
+        const auto & location = chunk.locations()[chunk_offset - 1];
         std::print(std::cerr, "  [{}:{}] in ", location.line, location.column);
 
         if (function->get_name().empty()) {
@@ -143,7 +143,7 @@ auto call(ObjClosure & closure, Byte arg_count) -> bool
 
     g_vm.frames.push_back({
             .closure = &closure,
-            .ip = function.get_chunk().code.data(),
+            .ip = function.get_chunk().code().data(),
             .slots = &g_vm.stack[slot_start],
     });
 
@@ -312,7 +312,7 @@ auto run() -> InterpretResult
         if constexpr (DEBUG_VM_EXECUTION) {
             print_stack(g_vm.stack);
 
-            const auto * chunk_start = current_chunk().code.data();
+            const auto * chunk_start = current_chunk().code().data();
             const auto offset
                     = static_cast<std::size_t>(std::distance(chunk_start, current_frame().ip));
 

@@ -174,7 +174,7 @@ auto blacken_object(Obj * obj) -> void
     }
     case Obj::ObjType::Function: {
         auto * function = dynamic_cast<ObjFunction *>(obj);
-        for (const auto & value : function->get_chunk().constants) {
+        for (const auto & value : function->get_chunk().constants()) {
             mark_value(value);
         }
         break;

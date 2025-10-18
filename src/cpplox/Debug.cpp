@@ -19,21 +19,21 @@ auto simple(std::string_view name, std::size_t offset) -> std::size_t
 
 auto constant(std::string_view name, const Chunk & chunk, std::size_t offset) -> std::size_t
 {
-    Byte constant_idx = chunk.code[offset + 1];
-    std::println("{:16} {:4} '{}'", name, constant_idx, chunk.constants[constant_idx]);
+    Byte constant_idx = chunk.code()[offset + 1];
+    std::println("{:16} {:4} '{}'", name, constant_idx, chunk.constants()[constant_idx]);
     return offset + 2;
 }
 
 auto invoke(std::string_view name, const Chunk & chunk, std::size_t offset) -> std::size_t
 {
-    Byte constant_idx = chunk.code[offset + 1];
-    Byte arg_count = chunk.code[offset + 2];
+    Byte constant_idx = chunk.code()[offset + 1];
+    Byte arg_count = chunk.code()[offset + 2];
 
     std::println(
             "{:16} {:4} '{}' ({} args)",
             name,
             constant_idx,
-            chunk.constants[constant_idx],
+            chunk.constants()[constant_idx],
             arg_count
     );
     return offset + 3;
@@ -41,7 +41,7 @@ auto invoke(std::string_view name, const Chunk & chunk, std::size_t offset) -> s
 
 auto byte(std::string_view name, const Chunk & chunk, std::size_t offset) -> std::size_t
 {
-    Byte slot = chunk.code[offset + 1];
+    Byte slot = chunk.code()[offset + 1];
     std::println("{:16} {:4}", name, slot);
     return offset + 2;
 }
@@ -49,8 +49,8 @@ auto byte(std::string_view name, const Chunk & chunk, std::size_t offset) -> std
 auto jump(std::string_view name, bool forward, const Chunk & chunk, std::size_t offset)
         -> std::size_t
 {
-    DoubleByte jump_length = static_cast<DoubleByte>(chunk.code[offset + 1] << BYTE_DIGITS)
-            | chunk.code[offset + 2];
+    DoubleByte jump_length = static_cast<DoubleByte>(chunk.code()[offset + 1] << BYTE_DIGITS)
+            | chunk.code()[offset + 2];
 
     std::size_t jump_to = offset + 3;
     if (forward) {
@@ -85,15 +85,15 @@ auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> std::si
     using enum OpCode;
 
     std::print("{:04} ", offset);
-    auto sloc = chunk.locations[offset];
-    if (offset > 0 && sloc.line == chunk.locations[offset - 1].line) {
+    auto sloc = chunk.locations()[offset];
+    if (offset > 0 && sloc.line == chunk.locations()[offset - 1].line) {
         std::print("{:>4}:{:<4} ", '|', sloc.column);
     }
     else {
         std::print("{:>4}:{:<4} ", sloc.line, sloc.column);
     }
 
-    auto instruction = static_cast<OpCode>(chunk.code[offset]);
+    auto instruction = static_cast<OpCode>(chunk.code()[offset]);
 
     switch (instruction) {
     // Values
@@ -135,13 +135,13 @@ auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> std::si
     case SuperInvoke: return invoke("OP_SUPER_INVOKE", chunk, offset);
     case Closure: {
         offset++;
-        Byte constant = chunk.code[offset++];
-        std::println("{:16} {:4} {}", "OP_CLOSURE", constant, chunk.constants[constant]);
+        Byte constant = chunk.code()[offset++];
+        std::println("{:16} {:4} {}", "OP_CLOSURE", constant, chunk.constants()[constant]);
 
-        auto * function = chunk.constants[constant].as_objfunction();
+        auto * function = chunk.constants()[constant].as_objfunction();
         for (auto _ : std::views::iota(0UZ, function->upvalue_count())) {
-            bool is_local = chunk.code[offset++] == 1;
-            Byte index = chunk.code[offset++];
+            bool is_local = chunk.code()[offset++] == 1;
+            Byte index = chunk.code()[offset++];
             std::print("{:04} {:>4} {:<4} ", offset - 2, ' ', ' ');
             std::println("{:16} {:4} {} {}", '|', ' ', is_local ? "local" : "upvalue", index);
         }
@@ -162,7 +162,7 @@ auto disassemble_chunk(const Chunk & chunk, std::string_view chunk_name) -> void
 {
     std::println("== {} ==", chunk_name);
 
-    for (std::size_t offset = 0; offset < chunk.code.size();) {
+    for (std::size_t offset = 0; offset < chunk.code().size();) {
         offset = disassemble_instruction(chunk, offset);
     }
 }
