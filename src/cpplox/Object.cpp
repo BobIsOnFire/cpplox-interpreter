@@ -225,7 +225,7 @@ auto mark_roots() -> void
         mark_object(frame.closure);
     }
 
-    for (ObjUpvalue * upvalue = g_vm.open_upvalues; upvalue != nullptr; upvalue = upvalue->next()) {
+    for (auto * upvalue : g_vm.open_upvalues) {
         mark_object(upvalue);
     }
 

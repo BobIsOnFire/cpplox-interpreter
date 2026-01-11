@@ -38,9 +38,6 @@ public:
 public:
     [[nodiscard]] constexpr auto location() const -> Value * { return m_location; }
 
-    constexpr auto set_next(ObjUpvalue * next) -> void { m_next = next; }
-    [[nodiscard]] constexpr auto next() const -> ObjUpvalue * { return m_next; }
-
     constexpr auto close() -> void
     {
         m_closed = *m_location;
@@ -57,7 +54,6 @@ private:
 
     Value * m_location;
     Value m_closed;
-    ObjUpvalue * m_next = nullptr; // intrusive list
 };
 
 export class ObjFunction : public Obj

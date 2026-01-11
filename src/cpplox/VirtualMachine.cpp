@@ -244,28 +244,17 @@ auto bind_method(ObjClass & cls, const std::string & name) -> bool
 
 auto capture_upvalue(Value * local) -> ObjUpvalue *
 {
-    ObjUpvalue * prev = nullptr;
-    ObjUpvalue * upvalue = g_vm.open_upvalues;
-
-    // well this is a huge pile of ptr comparison bullshit idk
-    while (upvalue != nullptr && upvalue->location() > local) {
-        prev = upvalue;
-        upvalue = upvalue->next();
+    auto it = g_vm.open_upvalues.begin();
+    while (it != g_vm.open_upvalues.end() && (*it)->location() > local) {
+        it++;
     }
 
-    if (upvalue != nullptr && upvalue->location() == local) {
-        return upvalue;
+    if (it != g_vm.open_upvalues.end() && (*it)->location() == local) {
+        return *it;
     }
 
     auto * created_upvalue = ObjUpvalue::create(local);
-    created_upvalue->set_next(upvalue);
-
-    if (prev == nullptr) {
-        g_vm.open_upvalues = created_upvalue;
-    }
-    else {
-        prev->set_next(created_upvalue);
-    }
+    g_vm.open_upvalues.insert(it, created_upvalue);
 
     return created_upvalue;
 }
@@ -273,10 +262,11 @@ auto capture_upvalue(Value * local) -> ObjUpvalue *
 auto close_upvalues(std::size_t last_offset) -> void
 {
     Value * last_location = &g_vm.stack[last_offset];
-    while (g_vm.open_upvalues != nullptr && g_vm.open_upvalues->location() >= last_location) {
-        auto * upvalue = g_vm.open_upvalues;
+
+    while (!g_vm.open_upvalues.empty() && g_vm.open_upvalues.front()->location() >= last_location) {
+        auto * upvalue = g_vm.open_upvalues.front();
         upvalue->close();
-        g_vm.open_upvalues = upvalue->next();
+        g_vm.open_upvalues.pop_front();
     }
 }
 

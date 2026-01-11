@@ -20,8 +20,7 @@ export struct VirtualMachine
     std::vector<Value> stack;
     std::vector<Obj *> objects;
     std::unordered_map<std::string, Value> globals;
-    // TODO: intrusive list used to guarantee sorted order. Could be an std::set or std::list?
-    ObjUpvalue * open_upvalues = nullptr; // intrusive list
+    std::list<ObjUpvalue *> open_upvalues;
 
     std::unordered_set<Obj *> gray_objects; // gray-marked
     std::size_t bytes_allocated = 0;
