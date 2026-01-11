@@ -144,7 +144,7 @@ auto call(ObjClosure & closure, Byte arg_count) -> bool
     g_vm.frames.push_back({
             .closure = &closure,
             .ip = function.get_chunk().code().data(),
-            .slots = &g_vm.stack[slot_start],
+            .stack_offset = slot_start,
     });
 
     return true;
@@ -270,9 +270,10 @@ auto capture_upvalue(Value * local) -> ObjUpvalue *
     return created_upvalue;
 }
 
-auto close_upvalues(Value * last) -> void
+auto close_upvalues(std::size_t last_offset) -> void
 {
-    while (g_vm.open_upvalues != nullptr && g_vm.open_upvalues->location() >= last) {
+    Value * last_location = &g_vm.stack[last_offset];
+    while (g_vm.open_upvalues != nullptr && g_vm.open_upvalues->location() >= last_location) {
         auto * upvalue = g_vm.open_upvalues;
         upvalue->close();
         g_vm.open_upvalues = upvalue->next();
@@ -354,7 +355,7 @@ auto run() -> InterpretResult
         }
         case GetLocal: {
             Byte slot = read_byte();
-            push_value(current_frame().slots[slot]);
+            push_value(g_vm.stack[current_frame().stack_offset + slot]);
             break;
         }
         case GetProperty: {
@@ -405,7 +406,7 @@ auto run() -> InterpretResult
         }
         case SetLocal: {
             Byte slot = read_byte();
-            current_frame().slots[slot] = peek_value();
+            g_vm.stack[current_frame().stack_offset + slot] = peek_value();
             break;
         }
         case SetProperty: {
@@ -526,7 +527,7 @@ auto run() -> InterpretResult
                 bool is_local = read_byte() == 1;
                 Byte index = read_byte();
                 if (is_local) {
-                    closure->add_upvalue(capture_upvalue(&current_frame().slots[index]));
+                    closure->add_upvalue(capture_upvalue(&g_vm.stack[current_frame().stack_offset + index]));
                 }
                 else {
                     closure->add_upvalue(current_frame().closure->upvalues()[index]);
@@ -535,14 +536,14 @@ auto run() -> InterpretResult
             break;
         }
         case CloseUpvalue: {
-            close_upvalues(&g_vm.stack.back());
+            close_upvalues(g_vm.stack.size() - 1);
             pop_value();
             break;
         }
         case Return: {
             Value result = pop_value();
-            auto * old_slots = g_vm.frames.back().slots;
-            close_upvalues(old_slots);
+            auto old_offset = g_vm.frames.back().stack_offset;
+            close_upvalues(old_offset);
 
             g_vm.frames.pop_back();
             if (g_vm.frames.empty()) {
@@ -551,7 +552,7 @@ auto run() -> InterpretResult
             }
 
             // FIXME: yeah, dirt. Should be solved if we actually use array for stack
-            while (&*g_vm.stack.end() != old_slots) {
+            while (g_vm.stack.size() != old_offset) {
                 pop_value();
             }
             push_value(result);
