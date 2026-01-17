@@ -17,6 +17,7 @@ namespace cpplox {
 namespace {
 constexpr const std::size_t FRAMES_MAX = 64;
 constexpr const std::size_t STACK_MAX = 256;
+const bool DEBUG_PRINT_CODE = std::getenv("LOX_DEBUG_PRINT_CODE") != nullptr;
 const bool DEBUG_VM_EXECUTION = std::getenv("LOX_DEBUG_VM_EXECUTION") != nullptr;
 } // namespace
 
@@ -517,7 +518,9 @@ auto run() -> InterpretResult
                 bool is_local = read_byte() == 1;
                 Byte index = read_byte();
                 if (is_local) {
-                    closure->add_upvalue(capture_upvalue(&g_vm.stack[current_frame().stack_offset + index]));
+                    closure->add_upvalue(
+                            capture_upvalue(&g_vm.stack[current_frame().stack_offset + index])
+                    );
                 }
                 else {
                     closure->add_upvalue(current_frame().closure->upvalues()[index]);
@@ -609,12 +612,64 @@ auto free_vm() -> void
     g_vm.objects.clear();
 }
 
+namespace {
+
+template <class... Ts> struct overloaded : Ts...
+{
+    using Ts::operator()...;
+};
+
+} // namespace
+
+auto load_code(std::span<const Code> code) -> ObjFunction *
+{
+    std::unordered_map<SourceLocation, ObjFunction *> functions;
+    for (const auto & c : code) {
+        functions.emplace(c.get_location(), ObjFunction::create(std::string{c.get_name()}));
+    }
+
+    const auto into_runtime_value = [&functions](const CompiledValue & value) -> Value {
+        return std::visit(
+                overloaded{
+                        [](const std::string & s) -> Value { return Value::string(s); },
+                        [](double n) -> Value { return Value::number(n); },
+                        [&functions](const FunctionReference & ref) -> Value {
+                            return Value::obj(functions[ref.sloc]);
+                        },
+                },
+                value
+        );
+    };
+
+    for (const auto & c : code) {
+        ObjFunction * func = functions[c.get_location()];
+        func->arity() = c.arity();
+        func->upvalue_count() = c.upvalue_count();
+        func->get_chunk() = {
+                c.code() | std::ranges::to<std::vector>(),
+                c.locations() | std::ranges::to<std::vector>(),
+                c.constants() | std::views::transform(into_runtime_value)
+                        | std::ranges::to<std::vector>(),
+        };
+
+        if (DEBUG_PRINT_CODE) [[unlikely]] {
+            disassemble_chunk(
+                    func->get_chunk(), func->get_name().empty() ? "<script>" : func->get_name()
+            );
+        }
+    }
+
+    // TODO: stricter way to define entrypoint function?
+    return functions[code.back().get_location()];
+}
+
 auto interpret(std::string_view source) -> InterpretResult
 {
-    auto * function = compile(source);
-    if (function == nullptr) {
+    auto code = compile(source);
+    if (!code.has_value()) {
         return InterpretResult::CompileError;
     }
+    auto * function = load_code(code.value());
 
     g_vm.gc_active = true;
 

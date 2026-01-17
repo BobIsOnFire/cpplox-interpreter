@@ -4,6 +4,7 @@ target_sources(cpplox
   PUBLIC
     FILE_SET cxx_modules TYPE CXX_MODULES FILES
       cpplox/Chunk.cppm
+      cpplox/Code.cppm
       cpplox/Compiler.cppm
       cpplox/Debug.cppm
       cpplox/EnumFormatter.cppm
@@ -19,7 +20,7 @@ target_sources(cpplox
       cpplox.cppm
     BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}
   PRIVATE
-    cpplox/Chunk.cpp
+    cpplox/Code.cpp
     cpplox/Compiler.cpp
     cpplox/Debug.cpp
     cpplox/Object.cpp
@@ -30,7 +31,8 @@ target_sources(cpplox
 
 target_link_libraries(cpplox PRIVATE
   Boost::headers # for Boost.Preprocessor
-  magic_enum-mod
+  module.boost.container_hash
+  module.magic_enum
 )
 
 add_executable(cpplox-exe)

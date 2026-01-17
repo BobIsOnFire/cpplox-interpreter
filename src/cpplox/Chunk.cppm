@@ -11,14 +11,18 @@ namespace cpplox {
 export class Chunk
 {
 public:
-    auto write(Byte data, SourceLocation sloc) -> void;
-    auto write(OpCode op, SourceLocation sloc) -> void;
+    Chunk() = default;
 
-    auto add_constant(Value value) -> std::size_t;
+    Chunk(std::vector<Byte> code,
+          std::vector<SourceLocation> locations,
+          std::vector<Value> constants)
+        : m_code(std::move(code))
+        , m_locations(std::move(locations))
+        , m_constants(std::move(constants))
+    {
+    }
 
     [[nodiscard]] auto code() const -> std::span<const Byte> { return m_code; }
-    [[nodiscard]] auto code() -> std::span<Byte> { return m_code; }
-
     [[nodiscard]] auto locations() const -> std::span<const SourceLocation> { return m_locations; }
     [[nodiscard]] auto constants() const -> std::span<const Value> { return m_constants; }
 

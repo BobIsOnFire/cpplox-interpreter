@@ -1,3 +1,4 @@
+find_package(Boost CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 
@@ -11,5 +12,6 @@ function(add_module_wrapper target external_target cppm)
   target_link_libraries(${target} PRIVATE ${external_target})
 endfunction()
 
-add_module_wrapper(magic_enum-mod magic_enum::magic_enum magic_enum.cppm)
-add_module_wrapper(yaml-cpp-mod yaml-cpp::yaml-cpp yaml-cpp.cppm)
+add_module_wrapper(module.boost.container_hash Boost::headers boost.container_hash.cppm)
+add_module_wrapper(module.magic_enum magic_enum::magic_enum magic_enum.cppm)
+add_module_wrapper(module.yaml-cpp yaml-cpp::yaml-cpp yaml-cpp.cppm)

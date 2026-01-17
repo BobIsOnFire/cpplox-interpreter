@@ -9,9 +9,8 @@ module cpplox;
 import std;
 
 import :Chunk;
+import :Code;
 import :Compiler;
-import :Debug;
-import :Object;
 import :OpCode;
 import :Scanner;
 
@@ -21,7 +20,6 @@ namespace cpplox {
 
 namespace {
 constexpr const std::size_t MAX_ARITY = 255;
-const bool DEBUG_PRINT_CODE = std::getenv("LOX_DEBUG_PRINT_CODE") != nullptr;
 } // namespace
 
 class Parser
@@ -186,8 +184,7 @@ private:
 
     struct FunctionCompiler
     {
-
-        ObjFunction * function = nullptr;
+        Code code;
         FunctionType type = FunctionType::Script;
 
         std::vector<Local> locals;
@@ -208,7 +205,7 @@ public:
         init_function(FunctionType::Script);
     }
 
-    [[nodiscard]] auto compile() -> ObjFunction *
+    [[nodiscard]] auto compile() -> std::optional<std::vector<Code>>
     {
         m_parser.advance();
 
@@ -216,8 +213,9 @@ public:
             declaration();
         }
 
-        auto * function = end_function().function;
-        return m_parser.had_errors() ? nullptr : function;
+        FunctionCompiler script_compiler = end_function();
+        m_code.push_back(std::move(script_compiler.code));
+        return m_parser.had_errors() ? std::nullopt : std::optional{std::move(m_code)};
     }
 
 private:
@@ -227,15 +225,12 @@ private:
     }
     [[nodiscard]] auto current_class() -> ClassCompiler & { return m_class_compilers.back(); }
 
-    [[nodiscard]] auto current_chunk() -> Chunk &
-    {
-        return current_function().function->get_chunk();
-    }
+    [[nodiscard]] auto current_code() -> Code & { return current_function().code; }
 
     // *** Byte Code Emitter ***
 
-    auto emit_byte(Byte byte) -> void { current_chunk().write(byte, m_op_sloc); }
-    auto emit_byte(OpCode op) -> void { current_chunk().write(op, m_op_sloc); }
+    auto emit_byte(Byte byte) -> void { current_code().write(byte, m_op_sloc); }
+    auto emit_byte(OpCode op) -> void { current_code().write(op, m_op_sloc); }
 
     template <typename ByteT, typename... Bytes> auto emit_bytes(ByteT byte, Bytes... bytes) -> void
     {
@@ -249,7 +244,7 @@ private:
     {
         emit_byte(OpCode::Loop);
 
-        std::size_t offset = current_chunk().code().size() - start + 2;
+        std::size_t offset = current_code().code().size() - start + 2;
         if (offset > DOUBLE_BYTE_MAX) {
             m_parser.error("Loop body too large.");
         }
@@ -262,24 +257,24 @@ private:
     {
         emit_bytes(instruction, BYTE_MAX, BYTE_MAX);
 
-        return current_chunk().code().size() - 2;
+        return current_code().code().size() - 2;
     }
 
     auto patch_jump(std::size_t offset) -> void
     {
-        std::size_t jump_length = current_chunk().code().size() - offset - 2;
+        std::size_t jump_length = current_code().code().size() - offset - 2;
 
         if (jump_length > DOUBLE_BYTE_MAX) {
             m_parser.error("Too much code to jump over.");
         }
 
-        current_chunk().code()[offset] = (jump_length >> BYTE_DIGITS) & BYTE_MAX;
-        current_chunk().code()[offset + 1] = jump_length & BYTE_MAX;
+        current_code().code()[offset] = (jump_length >> BYTE_DIGITS) & BYTE_MAX;
+        current_code().code()[offset + 1] = jump_length & BYTE_MAX;
     }
 
-    auto make_constant(Value value) -> Byte
+    auto make_constant(CompiledValue value) -> Byte
     {
-        std::size_t c = current_chunk().add_constant(value);
+        std::size_t c = current_code().add_constant(std::move(value));
         if (c >= BYTE_MAX) {
             m_parser.error("Too many constants in one chunk.");
             return 0;
@@ -288,7 +283,10 @@ private:
         return static_cast<Byte>(c);
     }
 
-    auto emit_constant(Value value) -> void { emit_bytes(OpCode::Constant, make_constant(value)); }
+    auto emit_constant(CompiledValue value) -> void
+    {
+        emit_bytes(OpCode::Constant, make_constant(std::move(value)));
+    }
 
     auto emit_return() -> void
     {
@@ -316,7 +314,7 @@ private:
         };
 
         return {
-            .function = ObjFunction::create(get_name()),
+            .code = Code(get_name(), m_parser.get_previous().sloc),
             .type = type,
             .locals = {
                 {
@@ -343,12 +341,6 @@ private:
         emit_return();
         FunctionCompiler compiler = std::move(m_function_compilers.back());
         m_function_compilers.pop_back();
-        if (DEBUG_PRINT_CODE) [[unlikely]] {
-            if (!m_parser.had_errors()) {
-                auto name = compiler.function->get_name();
-                disassemble_chunk(compiler.function->get_chunk(), name.empty() ? "<script>" : name);
-            }
-        }
         return compiler;
     }
 
@@ -369,7 +361,7 @@ private:
 
     auto identifier_constant(const Token & name) -> Byte
     {
-        return make_constant(Value::string(std::string{name.lexeme}));
+        return make_constant(std::string{name.lexeme});
     }
 
     auto synthetic_token(std::string_view name) -> Token
@@ -433,7 +425,7 @@ private:
         }
 
         compiler.upvalues.push_back({.index = index, .is_local = is_local});
-        return compiler.function->upvalue_count()++;
+        return compiler.code.upvalue_count()++;
     }
 
     // NOLINTNEXTLINE(misc-no-recursion)
@@ -561,7 +553,7 @@ private:
         );
         assert((result.ec == std::errc{}) && "Cannot parse Number token provided by Scanner");
 
-        emit_constant(Value::number(value));
+        emit_constant(value);
     }
 
     auto grouping(ParseContext /* ctx */) -> void
@@ -618,7 +610,7 @@ private:
     auto string(ParseContext /* ctx */) -> void
     {
         auto lexeme = m_parser.get_previous().lexeme;
-        emit_constant(Value::string(std::string{lexeme.substr(1, lexeme.length() - 2)}));
+        emit_constant(std::string{lexeme.substr(1, lexeme.length() - 2)});
     }
 
     auto and_ex(ParseContext /* ctx */) -> void
@@ -836,8 +828,8 @@ private:
         m_parser.consume(TokenType::LeftParenthesis, "Expect '(' after function name.");
         if (!m_parser.check(TokenType::RightParenthesis)) {
             do {
-                current_function().function->arity()++;
-                if (current_function().function->arity() > MAX_ARITY) {
+                current_function().code.arity()++;
+                if (current_function().code.arity() > MAX_ARITY) {
                     m_parser.error_at_current("Cannot have more than 255 parameters.");
                 }
                 Byte constant = parse_variable("Expect parameter name.");
@@ -849,11 +841,20 @@ private:
         block();
 
         FunctionCompiler compiler = end_function();
-        emit_bytes(OpCode::Closure, make_constant(Value::obj(compiler.function)));
+        emit_bytes(
+                OpCode::Closure,
+                make_constant(
+                        FunctionReference{
+                                .name = std::string{compiler.code.get_name()},
+                                .sloc = compiler.code.get_location(),
+                        }
+                )
+        );
 
         for (const auto & upvalue : compiler.upvalues) {
             emit_bytes(upvalue.is_local ? Byte(1) : Byte(0), upvalue.index);
         }
+        m_code.push_back(std::move(compiler.code));
     }
 
     auto method() -> void
@@ -949,7 +950,7 @@ private:
 
     auto while_statement() -> void
     {
-        std::size_t loop_start = current_chunk().code().size();
+        std::size_t loop_start = current_code().code().size();
 
         m_parser.consume(TokenType::LeftParenthesis, "Expect '(' after 'while'.");
         expression();
@@ -982,7 +983,7 @@ private:
             expression_statement();
         }
 
-        std::size_t loop_start = current_chunk().code().size();
+        std::size_t loop_start = current_code().code().size();
 
         std::optional<std::size_t> exit_jump;
         if (!m_parser.match(TokenType::Semicolon)) {
@@ -995,7 +996,7 @@ private:
 
         if (!m_parser.match(TokenType::RightParenthesis)) {
             std::size_t body_jump = emit_jump(OpCode::Jump);
-            std::size_t increment_start = current_chunk().code().size();
+            std::size_t increment_start = current_code().code().size();
 
             expression();
 
@@ -1095,7 +1096,7 @@ private:
                     .precedence = Precedence::precendence_val,                                     \
             }
 
-        //       Token type     | Prefix fn | Infix fn | Precedence 
+        //       Token type     | Prefix fn | Infix fn | Precedence
         ADD_RULE(And,             nullptr,    and_ex,    And);
         ADD_RULE(Bang,            unary,      nullptr,   None);
         ADD_RULE(BangEqual,       nullptr,    binary,    Equality);
@@ -1141,6 +1142,7 @@ private:
 private:
     std::vector<FunctionCompiler> m_function_compilers;
     std::vector<ClassCompiler> m_class_compilers;
+    std::vector<Code> m_code;
     Parser m_parser;
     SourceLocation m_op_sloc = {.line = 1, .column = 1};
 };
@@ -1150,7 +1152,7 @@ namespace {
 } // namespace
 
 // TODO: should denote failure, replace with std::expected
-auto compile(std::string_view source) -> ObjFunction *
+auto compile(std::string_view source) -> std::optional<std::vector<Code>>
 {
     ScannerPtr scanner = make_scanner(source);
     Parser parser(std::move(scanner));
