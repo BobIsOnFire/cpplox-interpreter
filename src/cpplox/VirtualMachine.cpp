@@ -19,9 +19,234 @@ constexpr const std::size_t FRAMES_MAX = 64;
 constexpr const std::size_t STACK_MAX = 256;
 const bool DEBUG_PRINT_CODE = std::getenv("LOX_DEBUG_PRINT_CODE") != nullptr;
 const bool DEBUG_VM_EXECUTION = std::getenv("LOX_DEBUG_VM_EXECUTION") != nullptr;
+const bool DEBUG_RUN_GC_EVERY_TIME = std::getenv("LOX_DEBUG_RUN_GC_EVERY_TIME") != nullptr;
+const bool DEBUG_LOG_GC = std::getenv("LOX_DEBUG_LOG_GC") != nullptr;
+constexpr const std::size_t GC_HEAP_GROW_FACTOR = 2;
 } // namespace
 
 namespace {
+
+auto object_size(Obj::ObjType type) -> std::size_t
+{
+    switch (type) {
+    case Obj::ObjType::Closure: return sizeof(ObjClosure);
+    case Obj::ObjType::Function: return sizeof(ObjFunction);
+    case Obj::ObjType::Native: return sizeof(ObjNative);
+    case Obj::ObjType::String: return sizeof(ObjString);
+    case Obj::ObjType::Upvalue: return sizeof(ObjUpvalue);
+    case Obj::ObjType::Class: return sizeof(ObjClass);
+    case Obj::ObjType::Instance: return sizeof(ObjInstance);
+    case Obj::ObjType::BoundMethod: return sizeof(ObjBoundMethod);
+    }
+}
+
+auto collect_garbage() -> void;
+
+auto save_object(Obj * obj) -> void
+{
+    if (g_vm.gc_active) {
+        if (DEBUG_RUN_GC_EVERY_TIME || g_vm.bytes_allocated >= g_vm.next_gc) {
+            collect_garbage();
+        }
+    }
+
+    if (DEBUG_LOG_GC) [[unlikely]] {
+        std::println(
+                std::cerr,
+                "Created {} at {}",
+                magic_enum::enum_name(obj->get_type()),
+                static_cast<void *>(obj)
+        );
+    }
+
+    g_vm.objects.push_back(obj);
+    g_vm.bytes_allocated += object_size(obj->get_type());
+}
+
+auto release_object(Obj * obj) -> void
+{
+    auto type = obj->get_type();
+
+    delete obj; // NOLINT(cppcoreguidelines-owning-memory)
+
+    g_vm.bytes_allocated -= object_size(type);
+
+    if (DEBUG_LOG_GC) [[unlikely]] {
+        std::println(
+                std::cerr,
+                "Released {} at {}",
+                magic_enum::enum_name(type),
+                static_cast<void *>(obj)
+        );
+    }
+}
+
+template <std::derived_from<Obj> T, typename... Args>
+    requires std::constructible_from<T, Args...>
+auto new_object(Args &&... args) -> T *
+{
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+    auto * newobj = new T(std::forward<Args>(args)...);
+    save_object(newobj);
+    return newobj;
+}
+
+auto mark_object(Obj * obj) -> void
+{
+    if (obj == nullptr) {
+        return;
+    }
+    if (obj->is_marked()) {
+        return;
+    }
+    if (DEBUG_LOG_GC) [[unlikely]] {
+        std::println(
+                std::cerr,
+                "Mark {} at {} ({})",
+                magic_enum::enum_name(obj->get_type()),
+                static_cast<void *>(obj),
+                Value::obj(obj)
+        );
+    }
+    obj->mark();
+    g_vm.gray_objects.insert(obj);
+}
+
+auto mark_value(const Value & value) -> void
+{
+    if (value.is_obj()) {
+        mark_object(value.as_obj());
+    }
+}
+
+auto blacken_object(Obj * obj) -> void
+{
+    if (DEBUG_LOG_GC) [[unlikely]] {
+        std::println(
+                std::cerr,
+                "Blacken {} at {} ({})",
+                magic_enum::enum_name(obj->get_type()),
+                static_cast<void *>(obj),
+                Value::obj(obj)
+        );
+    }
+
+    // TODO: definitely should be a virtual method in Obj classes
+    switch (obj->get_type()) {
+    case Obj::ObjType::Closure: {
+        auto * closure = dynamic_cast<ObjClosure *>(obj);
+        mark_object(closure->get_function());
+        for (const auto & value : closure->upvalues()) {
+            mark_object(value);
+        }
+        break;
+    }
+    case Obj::ObjType::Function: {
+        auto * function = dynamic_cast<ObjFunction *>(obj);
+        for (const auto & value : function->get_chunk().constants()) {
+            mark_value(value);
+        }
+        break;
+    }
+    case Obj::ObjType::Native:
+    case Obj::ObjType::String: break;
+    case Obj::ObjType::Upvalue: mark_value(*dynamic_cast<ObjUpvalue *>(obj)->location()); break;
+    case Obj::ObjType::Class: {
+        auto * cls = dynamic_cast<ObjClass *>(obj);
+        mark_object(cls->get_name());
+        for (const auto & [_, value] : cls->all_methods()) {
+            mark_value(value);
+        }
+        break;
+    }
+    case Obj::ObjType::Instance: {
+        auto * instance = dynamic_cast<ObjInstance *>(obj);
+        mark_object(instance->get_class());
+        for (const auto & [_, value] : instance->all_fields()) {
+            mark_value(value);
+        }
+        break;
+    }
+    case Obj::ObjType::BoundMethod: {
+        auto * bound_method = dynamic_cast<ObjBoundMethod *>(obj);
+        mark_value(bound_method->get_receiver());
+        mark_object(bound_method->get_method());
+        break;
+    }
+    }
+}
+
+auto mark_roots() -> void
+{
+    for (const auto & value : g_vm.stack) {
+        mark_value(value);
+    }
+
+    for (const auto & frame : g_vm.frames) {
+        mark_object(frame.closure);
+    }
+
+    for (auto * upvalue : g_vm.open_upvalues) {
+        mark_object(upvalue);
+    }
+
+    for (const auto & [_, value] : g_vm.globals) {
+        mark_value(value);
+    }
+}
+
+auto trace_references() -> void
+{
+    while (!g_vm.gray_objects.empty()) {
+        auto it = g_vm.gray_objects.begin();
+        Obj * obj = *it;
+        g_vm.gray_objects.erase(it);
+
+        blacken_object(obj);
+    }
+}
+
+auto sweep() -> void
+{
+    std::vector<Obj *> new_objects;
+    for (auto * obj : g_vm.objects) {
+        if (obj->is_marked()) {
+            obj->clear_mark();
+            new_objects.push_back(obj);
+        }
+        else {
+            release_object(obj);
+        }
+    }
+    g_vm.objects = std::move(new_objects);
+}
+
+auto collect_garbage() -> void
+{
+    if (DEBUG_LOG_GC) [[unlikely]] {
+        std::println(std::cerr, "-- gc begin");
+    }
+
+    std::size_t before = g_vm.bytes_allocated;
+
+    mark_roots();
+    trace_references();
+    sweep();
+
+    g_vm.next_gc = g_vm.bytes_allocated * GC_HEAP_GROW_FACTOR;
+
+    if (DEBUG_LOG_GC) [[unlikely]] {
+        std::println(std::cerr, "-- gc end");
+        std::println(
+                std::cerr,
+                "   collected {} bytes (from {} to {}), next gc at {}",
+                before - g_vm.bytes_allocated,
+                before,
+                g_vm.bytes_allocated,
+                g_vm.next_gc
+        );
+    }
+}
 
 auto current_frame() -> CallFrame & { return g_vm.frames.back(); }
 auto current_chunk() -> Chunk & { return current_frame().closure->get_function()->get_chunk(); }
@@ -163,7 +388,7 @@ auto call_value(Value callee, Byte arg_count) -> bool
         auto * cls = callee.as_objclass();
         // place newly created instance before args on the stack to get 'this' resolved correctly to
         // it
-        g_vm.stack[g_vm.stack.size() - arg_count - 1] = Value::instance(cls);
+        g_vm.stack[g_vm.stack.size() - arg_count - 1] = Value::obj(new_object<ObjInstance>(cls));
 
         auto init = cls->get_method("init");
         if (init.has_value()) {
@@ -235,7 +460,7 @@ auto bind_method(ObjClass & cls, const std::string & name) -> bool
         return false;
     }
 
-    auto * bound = ObjBoundMethod::create(peek_value(), method.value().as_objclosure());
+    auto * bound = new_object<ObjBoundMethod>(peek_value(), method.value().as_objclosure());
 
     pop_value();
     push_value(Value::obj(bound));
@@ -254,7 +479,7 @@ auto capture_upvalue(Value * local) -> ObjUpvalue *
         return *it;
     }
 
-    auto * created_upvalue = ObjUpvalue::create(local);
+    auto * created_upvalue = new_object<ObjUpvalue>(local);
     g_vm.open_upvalues.insert(it, created_upvalue);
 
     return created_upvalue;
@@ -283,7 +508,7 @@ auto define_method(const std::string & name) -> void
 auto define_native(std::string_view name, Value::NativeFn callable) -> void
 {
     // pushing and popping some GC bullsheesh
-    push_value(Value::native(callable));
+    push_value(Value::obj(new_object<ObjNative>(callable)));
     g_vm.globals.emplace(name, g_vm.stack.back());
     pop_value();
 }
@@ -436,7 +661,7 @@ auto run() -> InterpretResult
             if (peek_value(0).is_string() && peek_value(1).is_string()) {
                 const auto & rhs = peek_value(0).as_string();
                 const auto & lhs = peek_value(1).as_string();
-                auto value = Value::string(lhs + rhs);
+                auto value = Value::obj(new_object<ObjString>(lhs + rhs));
                 pop_value();
                 pop_value();
                 push_value(value);
@@ -511,7 +736,7 @@ auto run() -> InterpretResult
         }
         case Closure: {
             auto * function = read_constant().as_objfunction();
-            auto * closure = ObjClosure::create(function);
+            auto * closure = new_object<ObjClosure>(function);
             push_value(Value::obj(closure));
 
             for (auto _ : std::views::iota(0UZ, function->upvalue_count())) {
@@ -553,7 +778,7 @@ auto run() -> InterpretResult
         }
         case Class: {
             auto * name = read_constant().as_objstring();
-            push_value(Value::cls(name));
+            push_value(Value::obj(new_object<ObjClass>(name)));
             break;
         }
         case Inherit: {
@@ -625,13 +850,15 @@ auto load_code(std::span<const Code> code) -> ObjFunction *
 {
     std::unordered_map<SourceLocation, ObjFunction *> functions;
     for (const auto & c : code) {
-        functions.emplace(c.get_location(), ObjFunction::create(std::string{c.get_name()}));
+        functions.emplace(c.get_location(), new_object<ObjFunction>(std::string{c.get_name()}));
     }
 
     const auto into_runtime_value = [&functions](const CompiledValue & value) -> Value {
         return std::visit(
                 overloaded{
-                        [](const std::string & s) -> Value { return Value::string(s); },
+                        [](const std::string & s) -> Value {
+                            return Value::obj(new_object<ObjString>(s));
+                        },
                         [](double n) -> Value { return Value::number(n); },
                         [&functions](const FunctionReference & ref) -> Value {
                             return Value::obj(functions[ref.sloc]);
@@ -678,7 +905,7 @@ auto interpret(std::string_view source) -> InterpretResult
     g_vm.stack.reserve(STACK_MAX);
 
     push_value(Value::obj(function));
-    auto * closure = ObjClosure::create(function);
+    auto * closure = new_object<ObjClosure>(function);
     pop_value();
     push_value(Value::obj(closure));
     call(*closure, 0);

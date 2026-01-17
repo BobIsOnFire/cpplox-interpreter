@@ -23,7 +23,6 @@ target_sources(cpplox
     cpplox/Code.cpp
     cpplox/Compiler.cpp
     cpplox/Debug.cpp
-    cpplox/Object.cpp
     cpplox/Scanner.cpp
     cpplox/Value.cpp
     cpplox/VirtualMachine.cpp

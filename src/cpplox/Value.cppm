@@ -23,7 +23,6 @@ public:
         Obj,
     };
 
-private:
     union ValueData
     {
         bool boolean;
@@ -43,23 +42,9 @@ public:
     // Initializers
 
     static auto boolean(bool value) -> Value { return {ValueType::Boolean, {.boolean = value}}; }
-
     static auto nil() -> Value { return {ValueType::Nil, {.number = 0}}; }
-
     static auto number(double value) -> Value { return {ValueType::Number, {.number = value}}; }
-
-    // Do we need Obj/ObjString stuff in public members? Can we hide everything
-    // behind our Obj * field?
     static auto obj(Obj * obj) -> Value { return {ValueType::Obj, {.obj = obj}}; }
-
-    static auto string(std::string) -> Value;
-    static auto upvalue(Value *) -> Value;
-    static auto function(std::string) -> Value;
-    static auto closure(ObjFunction *) -> Value;
-    static auto native(NativeFn) -> Value;
-    static auto cls(ObjString *) -> Value;
-    static auto instance(ObjClass *) -> Value;
-    static auto bound_method(Value, ObjClosure *) -> Value;
 
     // Casts
 

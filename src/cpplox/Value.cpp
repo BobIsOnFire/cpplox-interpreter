@@ -16,46 +16,6 @@ template <Obj::ObjType type> auto value_is_obj_type(Value value) -> bool
 
 } // namespace
 
-auto Value::string(std::string data) -> Value
-{
-    return {ValueType::Obj, {.obj = ObjString::create(std::move(data))}};
-}
-
-auto Value::upvalue(Value * location) -> Value
-{
-    return {ValueType::Obj, {.obj = ObjUpvalue::create(location)}};
-}
-
-auto Value::function(std::string name) -> Value
-{
-    return {ValueType::Obj, {.obj = ObjFunction::create(std::move(name))}};
-}
-
-auto Value::closure(ObjFunction * function) -> Value
-{
-    return {ValueType::Obj, {.obj = ObjClosure::create(function)}};
-}
-
-auto Value::native(Value::NativeFn callable) -> Value
-{
-    return {ValueType::Obj, {.obj = ObjNative::create(callable)}};
-}
-
-auto Value::cls(ObjString * name) -> Value
-{
-    return {ValueType::Obj, {.obj = ObjClass::create(name)}};
-}
-
-auto Value::instance(ObjClass * cls) -> Value
-{
-    return {ValueType::Obj, {.obj = ObjInstance::create(cls)}};
-}
-
-auto Value::bound_method(Value receiver, ObjClosure * method) -> Value
-{
-    return {ValueType::Obj, {.obj = ObjBoundMethod::create(receiver, method)}};
-}
-
 auto Value::is_string() const -> bool { return value_is_obj_type<Obj::ObjType::String>(*this); }
 
 auto Value::is_upvalue() const -> bool { return value_is_obj_type<Obj::ObjType::Upvalue>(*this); }

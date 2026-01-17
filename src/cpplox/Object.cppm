@@ -13,18 +13,16 @@ namespace cpplox {
 export class ObjString : public Obj
 {
 public:
-    static auto create(std::string data) -> ObjString *;
-
-public:
-    [[nodiscard]] constexpr auto data() const -> const std::string & { return m_data; }
-
-private:
     explicit ObjString(std::string data)
         : Obj(ObjType::String)
         , m_data(std::move(data))
     {
     }
 
+public:
+    [[nodiscard]] constexpr auto data() const -> const std::string & { return m_data; }
+
+private:
     // TODO: Can we do a flexible array member for this to avoid double indirection?
     // See: ch. 19 challenges, https://en.wikipedia.org/wiki/Flexible_array_member
     std::string m_data;
@@ -33,7 +31,12 @@ private:
 export class ObjUpvalue : public Obj
 {
 public:
-    static auto create(Value * location) -> ObjUpvalue *;
+    explicit ObjUpvalue(Value * location)
+        : Obj(ObjType::Upvalue)
+        , m_location(location)
+        , m_closed(Value::nil())
+    {
+    }
 
 public:
     [[nodiscard]] constexpr auto location() const -> Value * { return m_location; }
@@ -45,13 +48,6 @@ public:
     }
 
 private:
-    explicit ObjUpvalue(Value * location)
-        : Obj(ObjType::Upvalue)
-        , m_location(location)
-        , m_closed(Value::nil())
-    {
-    }
-
     Value * m_location;
     Value m_closed;
 };
@@ -59,7 +55,11 @@ private:
 export class ObjFunction : public Obj
 {
 public:
-    static auto create(std::string name) -> ObjFunction *;
+    explicit ObjFunction(std::string name)
+        : Obj(ObjType::Function)
+        , m_name(std::move(name))
+    {
+    }
 
 public:
     [[nodiscard]] constexpr auto get_name() const -> std::string_view { return m_name; }
@@ -80,40 +80,42 @@ public:
     }
 
 private:
-    explicit ObjFunction(std::string name)
-        : Obj(ObjType::Function)
-        , m_name(std::move(name))
-    {
-    }
-
     std::size_t m_arity = 0;
     std::size_t m_upvalue_count = 0;
     Chunk m_chunk;
     std::string m_name;
 };
 
+// very cool clang, you don't see usage within deducing this template and now i'm sad
+static_assert(requires(const ObjFunction & obj) {
+    obj.arity();
+    obj.upvalue_count();
+});
+
 class ObjNative : public Obj
 {
 public:
-    static auto create(Value::NativeFn callable) -> ObjNative *;
-
-public:
-    [[nodiscard]] constexpr auto get_callable() const -> Value::NativeFn { return m_callable; }
-
-private:
     explicit ObjNative(Value::NativeFn callable)
         : Obj(ObjType::Native)
         , m_callable(callable)
     {
     }
 
+public:
+    [[nodiscard]] constexpr auto get_callable() const -> Value::NativeFn { return m_callable; }
+
+private:
     Value::NativeFn m_callable;
 };
 
 export class ObjClosure : public Obj
 {
 public:
-    static auto create(ObjFunction * function) -> ObjClosure *;
+    explicit ObjClosure(ObjFunction * function)
+        : Obj(ObjType::Closure)
+        , m_function(function)
+    {
+    }
 
 public:
     [[nodiscard]] constexpr auto get_function() const -> ObjFunction * { return m_function; }
@@ -126,12 +128,6 @@ public:
     }
 
 private:
-    explicit ObjClosure(ObjFunction * function)
-        : Obj(ObjType::Closure)
-        , m_function(function)
-    {
-    }
-
     ObjFunction * m_function;
     std::vector<ObjUpvalue *> m_upvalues;
 };
@@ -139,7 +135,11 @@ private:
 export class ObjClass : public Obj
 {
 public:
-    static auto create(ObjString * name) -> ObjClass *;
+    explicit ObjClass(ObjString * name)
+        : Obj(ObjType::Class)
+        , m_name(name)
+    {
+    }
 
 public:
     [[nodiscard]] constexpr auto get_name() const -> ObjString * { return m_name; }
@@ -170,12 +170,6 @@ public:
     }
 
 private:
-    explicit ObjClass(ObjString * name)
-        : Obj(ObjType::Class)
-        , m_name(name)
-    {
-    }
-
     ObjString * m_name; // TODO: somehow use string_view into source code instead?
     std::unordered_map<std::string, Value> m_methods;
 };
@@ -183,7 +177,11 @@ private:
 export class ObjInstance : public Obj
 {
 public:
-    static auto create(ObjClass * cls) -> ObjInstance *;
+    explicit ObjInstance(ObjClass * cls)
+        : Obj(ObjType::Instance)
+        , m_class(cls)
+    {
+    }
 
 public:
     [[nodiscard]] constexpr auto get_class() const -> ObjClass * { return m_class; }
@@ -214,12 +212,6 @@ public:
     }
 
 private:
-    explicit ObjInstance(ObjClass * cls)
-        : Obj(ObjType::Instance)
-        , m_class(cls)
-    {
-    }
-
     ObjClass * m_class;
     std::unordered_map<std::string, Value> m_fields;
 };
@@ -227,13 +219,6 @@ private:
 export class ObjBoundMethod : public Obj
 {
 public:
-    static auto create(Value receiver, ObjClosure * method) -> ObjBoundMethod *;
-
-public:
-    [[nodiscard]] constexpr auto get_receiver() const -> Value { return m_receiver; }
-    [[nodiscard]] constexpr auto get_method() const -> ObjClosure * { return m_method; }
-
-private:
     ObjBoundMethod(Value receiver, ObjClosure * method)
         : Obj(ObjType::BoundMethod)
         , m_receiver(receiver)
@@ -241,6 +226,11 @@ private:
     {
     }
 
+public:
+    [[nodiscard]] constexpr auto get_receiver() const -> Value { return m_receiver; }
+    [[nodiscard]] constexpr auto get_method() const -> ObjClosure * { return m_method; }
+
+private:
     Value m_receiver;
     ObjClosure * m_method;
 };

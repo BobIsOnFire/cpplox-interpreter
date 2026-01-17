@@ -51,8 +51,6 @@ export class ObjClass;
 export class ObjInstance;
 export class ObjBoundMethod;
 
-export auto release_object(Obj * obj) -> void;
-
 } // namespace cpplox
 
 template <>
