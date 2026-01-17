@@ -21,9 +21,7 @@ public:
     virtual auto interpret(std::string_view source) -> InterpretResult = 0;
 };
 
-// FIXME remove global object and replace with unique_ptr
-export using VirtualMachinePtr = IVirtualMachine *;
-// export using VirtualMachinePtr = std::unique_ptr<IVirtualMachine>;
+export using VirtualMachinePtr = std::unique_ptr<IVirtualMachine>;
 
 export auto make_vm() -> VirtualMachinePtr;
 

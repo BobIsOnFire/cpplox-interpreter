@@ -5,7 +5,7 @@ namespace {
 
 auto repl() -> void
 {
-    auto * vm = cpplox::make_vm();
+    auto vm = cpplox::make_vm();
     for (std::string line; std::print("> "), std::getline(std::cin, line);) {
         [[maybe_unused]] auto result = vm->interpret(line);
     }
@@ -24,7 +24,7 @@ auto run_file(const std::filesystem::path & filename) -> void
     buffer << script.rdbuf();
     script.close();
 
-    auto * vm = cpplox::make_vm();
+    auto vm = cpplox::make_vm();
     auto result = vm->interpret(buffer.str());
 
     if (result == cpplox::InterpretResult::CompileError) {
