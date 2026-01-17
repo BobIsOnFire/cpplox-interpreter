@@ -14,6 +14,55 @@ import :VirtualMachine;
 
 namespace cpplox {
 
+struct CallFrame
+{
+    ObjClosure * closure;
+    const Byte * ip;
+    std::size_t stack_offset;
+};
+
+// FIXME: Should be inlined into constructor/desctructor, but should get rid of global object first
+auto init_vm() -> void;
+auto free_vm() -> void;
+
+auto interpret(std::string_view source) -> InterpretResult;
+
+struct VirtualMachine : IVirtualMachine
+{
+    VirtualMachine() {
+        init_vm();
+    }
+
+    ~VirtualMachine() override {
+        free_vm();
+    }
+
+    auto interpret(std::string_view source) -> InterpretResult override
+    {
+        return cpplox::interpret(source);
+    }
+
+    std::vector<CallFrame> frames;
+    std::vector<Value> stack;
+    std::vector<Obj *> objects;
+    std::unordered_map<std::string, Value> globals;
+    std::list<ObjUpvalue *> open_upvalues;
+
+    std::unordered_set<Obj *> gray_objects; // gray-marked
+    std::size_t bytes_allocated = 0;
+    std::size_t next_gc = 1024UZ * 1024;
+    bool gc_active = false;
+};
+
+// FIXME: get rid of singleton instance
+VirtualMachine g_vm; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+
+auto make_vm() -> VirtualMachinePtr {
+    // FIXME remove global object and replace with unique_ptr
+    return &g_vm;
+    // return std::make_unique<VirtualMachine>();
+}
+
 namespace {
 constexpr const std::size_t FRAMES_MAX = 64;
 constexpr const std::size_t STACK_MAX = 256;

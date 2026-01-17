@@ -7,27 +7,6 @@ import :Value;
 
 namespace cpplox {
 
-export struct CallFrame
-{
-    ObjClosure * closure;
-    const Byte * ip;
-    std::size_t stack_offset;
-};
-
-export struct VirtualMachine
-{
-    std::vector<CallFrame> frames;
-    std::vector<Value> stack;
-    std::vector<Obj *> objects;
-    std::unordered_map<std::string, Value> globals;
-    std::list<ObjUpvalue *> open_upvalues;
-
-    std::unordered_set<Obj *> gray_objects; // gray-marked
-    std::size_t bytes_allocated = 0;
-    std::size_t next_gc = 1024UZ * 1024;
-    bool gc_active = false;
-};
-
 // TODO: make this store error only, and use std::expected<std::monostate, InterpretError> for this
 export enum class [[nodiscard]] InterpretResult : std::uint8_t {
     Ok,
@@ -35,13 +14,17 @@ export enum class [[nodiscard]] InterpretResult : std::uint8_t {
     RuntimeError,
 };
 
-// FIXME: get rid of singleton instance
-VirtualMachine g_vm; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+export class IVirtualMachine
+{
+public:
+    virtual ~IVirtualMachine() = default;
+    virtual auto interpret(std::string_view source) -> InterpretResult = 0;
+};
 
-// FIXME: Should be done by constructor/desctructor, but should get rid of global object first
-export auto init_vm() -> void;
-export auto free_vm() -> void;
+// FIXME remove global object and replace with unique_ptr
+export using VirtualMachinePtr = IVirtualMachine *;
+// export using VirtualMachinePtr = std::unique_ptr<IVirtualMachine>;
 
-export auto interpret(std::string_view source) -> InterpretResult;
+export auto make_vm() -> VirtualMachinePtr;
 
 } // namespace cpplox
