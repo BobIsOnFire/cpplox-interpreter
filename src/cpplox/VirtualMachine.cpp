@@ -6,6 +6,9 @@ module cpplox;
 
 import std;
 
+// TODO: replace with std::inplace_vector (C++26) once it's supported
+import beman.inplace_vector;
+
 import :Compiler;
 import :Debug;
 import :Object;
@@ -78,6 +81,8 @@ public:
 
     // Disallow copy/move, at least for now. Stuff might get complicated with all that manual memory
     // management.
+    // VM object is also stupidly large right now because it stores entire stack and frames
+    // in-place.
     VirtualMachine(const VirtualMachine &) = delete;
     VirtualMachine(VirtualMachine &&) = delete;
     auto operator=(const VirtualMachine &) const -> VirtualMachine & = delete;
@@ -93,10 +98,6 @@ public:
         m_gc_active = false;
         auto * function = load_code(code.value());
         m_gc_active = true;
-
-        // FIXME: hack. Should use arrays inside VM object instead.
-        m_frames.reserve(FRAMES_MAX);
-        m_stack.reserve(STACK_MAX);
 
         push_value(Value::obj(function));
         auto * closure = new_object<ObjClosure>(function);
@@ -834,8 +835,8 @@ private:
     }
 
 private:
-    std::vector<CallFrame> m_frames;
-    std::vector<Value> m_stack;
+    beman::inplace_vector::inplace_vector<CallFrame, FRAMES_MAX> m_frames;
+    beman::inplace_vector::inplace_vector<Value, STACK_MAX> m_stack;
     std::vector<Obj *> m_objects;
     std::unordered_map<std::string, Value> m_globals;
     std::list<ObjUpvalue *> m_open_upvalues;

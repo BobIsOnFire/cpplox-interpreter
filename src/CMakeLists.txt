@@ -32,6 +32,7 @@ target_sources(cpplox
 
 target_link_libraries(cpplox PRIVATE
   Boost::headers # for Boost.Preprocessor
+  module.beman.inplace_vector
   module.boost.container_hash
   module.magic_enum
 )
