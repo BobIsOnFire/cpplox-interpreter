@@ -26,11 +26,6 @@ public:
 
     [[nodiscard]] constexpr auto get_type() const -> ObjType { return m_type; }
 
-    // TODO: Should probably be virtual instead of having out-of-line mark_object()
-    constexpr auto mark() -> void { m_marked = true; }
-    constexpr auto clear_mark() -> void { m_marked = false; }
-    [[nodiscard]] constexpr auto is_marked() const -> bool { return m_marked; }
-
 protected:
     explicit Obj(ObjType type)
         : m_type(type)
@@ -39,7 +34,6 @@ protected:
 
 private:
     ObjType m_type;
-    bool m_marked = false;
 };
 
 export class ObjString;

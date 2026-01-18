@@ -9,6 +9,7 @@ import std;
 import :Compiler;
 import :Debug;
 import :Object;
+import :ObjReferenceTracer;
 import :OpCode;
 import :VirtualMachine;
 
@@ -88,8 +89,9 @@ public:
         if (!code.has_value()) {
             return InterpretResult::CompileError;
         }
-        auto * function = load_code(code.value());
 
+        m_gc_active = false;
+        auto * function = load_code(code.value());
         m_gc_active = true;
 
         // FIXME: hack. Should use arrays inside VM object instead.
@@ -165,138 +167,6 @@ private:
         return newobj;
     }
 
-    /*** Garbage collection ***/
-
-    auto mark_object(Obj * obj) -> void
-    {
-        if (obj == nullptr) {
-            return;
-        }
-        if (obj->is_marked()) {
-            return;
-        }
-        if (DEBUG_LOG_GC) [[unlikely]] {
-            std::println(
-                    std::cerr,
-                    "Mark {} at {} ({})",
-                    magic_enum::enum_name(obj->get_type()),
-                    static_cast<void *>(obj),
-                    Value::obj(obj)
-            );
-        }
-        obj->mark();
-        m_gray_objects.insert(obj);
-    }
-
-    auto mark_value(const Value & value) -> void
-    {
-        if (value.is_obj()) {
-            mark_object(value.as_obj());
-        }
-    }
-
-    auto blacken_object(Obj * obj) -> void
-    {
-        if (DEBUG_LOG_GC) [[unlikely]] {
-            std::println(
-                    std::cerr,
-                    "Blacken {} at {} ({})",
-                    magic_enum::enum_name(obj->get_type()),
-                    static_cast<void *>(obj),
-                    Value::obj(obj)
-            );
-        }
-
-        // TODO: definitely should be a virtual method in Obj classes
-        switch (obj->get_type()) {
-        case Obj::ObjType::Closure: {
-            auto * closure = dynamic_cast<ObjClosure *>(obj);
-            mark_object(closure->get_function());
-            for (const auto & value : closure->upvalues()) {
-                mark_object(value);
-            }
-            break;
-        }
-        case Obj::ObjType::Function: {
-            auto * function = dynamic_cast<ObjFunction *>(obj);
-            for (const auto & value : function->get_chunk().constants()) {
-                mark_value(value);
-            }
-            break;
-        }
-        case Obj::ObjType::Native:
-        case Obj::ObjType::String: break;
-        case Obj::ObjType::Upvalue: mark_value(*dynamic_cast<ObjUpvalue *>(obj)->location()); break;
-        case Obj::ObjType::Class: {
-            auto * cls = dynamic_cast<ObjClass *>(obj);
-            mark_object(cls->get_name());
-            for (const auto & [_, value] : cls->all_methods()) {
-                mark_value(value);
-            }
-            break;
-        }
-        case Obj::ObjType::Instance: {
-            auto * instance = dynamic_cast<ObjInstance *>(obj);
-            mark_object(instance->get_class());
-            for (const auto & [_, value] : instance->all_fields()) {
-                mark_value(value);
-            }
-            break;
-        }
-        case Obj::ObjType::BoundMethod: {
-            auto * bound_method = dynamic_cast<ObjBoundMethod *>(obj);
-            mark_value(bound_method->get_receiver());
-            mark_object(bound_method->get_method());
-            break;
-        }
-        }
-    }
-
-    auto mark_roots() -> void
-    {
-        for (const auto & value : m_stack) {
-            mark_value(value);
-        }
-
-        for (const auto & frame : m_frames) {
-            mark_object(frame.closure);
-        }
-
-        for (auto * upvalue : m_open_upvalues) {
-            mark_object(upvalue);
-        }
-
-        for (const auto & [_, value] : m_globals) {
-            mark_value(value);
-        }
-    }
-
-    auto trace_references() -> void
-    {
-        while (!m_gray_objects.empty()) {
-            auto it = m_gray_objects.begin();
-            Obj * obj = *it;
-            m_gray_objects.erase(it);
-
-            blacken_object(obj);
-        }
-    }
-
-    auto sweep() -> void
-    {
-        std::vector<Obj *> new_objects;
-        for (auto * obj : m_objects) {
-            if (obj->is_marked()) {
-                obj->clear_mark();
-                new_objects.push_back(obj);
-            }
-            else {
-                release_object(obj);
-            }
-        }
-        m_objects = std::move(new_objects);
-    }
-
     auto collect_garbage() -> void
     {
         if (DEBUG_LOG_GC) [[unlikely]] {
@@ -305,10 +175,35 @@ private:
 
         std::size_t before = m_bytes_allocated;
 
-        mark_roots();
-        trace_references();
-        sweep();
+        // Mark
 
+        ObjReferenceTracer tracer({.debug_log_gc = DEBUG_LOG_GC});
+        for (const auto & value : m_stack) {
+            tracer.trace(value);
+        }
+        for (const auto & frame : m_frames) {
+            tracer.trace(frame.closure);
+        }
+        for (auto * upvalue : m_open_upvalues) {
+            tracer.trace(upvalue);
+        }
+        for (const auto & [_, value] : m_globals) {
+            tracer.trace(value);
+        }
+
+        // Sweep
+
+        std::vector<Obj *> new_objects;
+        for (auto * obj : m_objects) {
+            if (tracer.is_referenced(obj)) {
+                new_objects.push_back(obj);
+            }
+            else {
+                release_object(obj);
+            }
+        }
+
+        m_objects = std::move(new_objects);
         m_next_gc = m_bytes_allocated * GC_HEAP_GROW_FACTOR;
 
         if (DEBUG_LOG_GC) [[unlikely]] {
@@ -945,7 +840,6 @@ private:
     std::unordered_map<std::string, Value> m_globals;
     std::list<ObjUpvalue *> m_open_upvalues;
 
-    std::unordered_set<Obj *> m_gray_objects; // gray-marked
     std::size_t m_bytes_allocated = 0;
     std::size_t m_next_gc = GC_HEAP_INITIAL_THRESHOLD;
     bool m_gc_active = false;

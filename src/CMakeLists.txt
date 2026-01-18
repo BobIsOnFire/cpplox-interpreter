@@ -10,6 +10,7 @@ target_sources(cpplox
       cpplox/EnumFormatter.cppm
       cpplox/Obj.cppm
       cpplox/Object.cppm
+      cpplox/ObjReferenceTracer.cppm
       cpplox/OpCode.cppm
       cpplox/Scanner.cppm
       cpplox/SourceLocation.cppm
@@ -23,6 +24,7 @@ target_sources(cpplox
     cpplox/Code.cpp
     cpplox/Compiler.cpp
     cpplox/Debug.cpp
+    cpplox/ObjReferenceTracer.cpp
     cpplox/Scanner.cpp
     cpplox/Value.cpp
     cpplox/VirtualMachine.cpp
