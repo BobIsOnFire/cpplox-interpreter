@@ -120,7 +120,7 @@ auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> std::si
     case Greater: return simple("OP_GREATER", offset);
     // Binary ops
     case Add: return simple("OP_ADD", offset);
-    case Substract: return simple("OP_SUBSTRACT", offset);
+    case Subtract: return simple("OP_SUBTRACT", offset);
     case Multiply: return simple("OP_MULTIPLY", offset);
     case Divide: return simple("OP_DIVIDE", offset);
     // Unary ops

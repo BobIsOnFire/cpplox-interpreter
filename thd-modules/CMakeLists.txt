@@ -15,13 +15,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(beman.inplace_vector)
 
 function(add_module_wrapper target external_target cppm)
-  add_library(${target} OBJECT)
-  target_sources(${target}
-    PUBLIC
-      FILE_SET CXX_MODULES FILES
-        ${cppm}
-  )
-  target_link_libraries(${target} PRIVATE ${external_target})
+    add_library(${target} OBJECT)
+    target_sources(${target} PUBLIC FILE_SET CXX_MODULES FILES ${cppm})
+    target_link_libraries(${target} PRIVATE ${external_target})
 endfunction()
 
 add_module_wrapper(module.beman.inplace_vector beman::inplace_vector beman.inplace_vector.cppm)

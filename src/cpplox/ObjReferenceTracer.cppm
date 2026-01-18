@@ -10,13 +10,15 @@ namespace cpplox {
 export class ObjReferenceTracer
 {
 public:
-    struct Settings {
+    struct Settings
+    {
         bool debug_log_gc = false;
     };
 
     explicit ObjReferenceTracer(Settings settings)
         : m_settings(settings)
-    {}
+    {
+    }
 
     auto trace(Obj * obj) -> void;
     auto trace(Value value) -> void;

@@ -2,7 +2,10 @@
 cmake_policy(SET CMP0140 NEW)
 
 if(NOT DEFINED CPPLOX_EXE OR NOT DEFINED TEST_FILE)
-    message(FATAL_ERROR "Usage: cmake -DCPPLOX_EXE=<exe> -DTEST_FILE=<file> -P testrunner.cmake")
+    message(
+        FATAL_ERROR
+        "Usage: cmake -DCPPLOX_EXE=<exe> -DTEST_FILE=<file> -P testrunner.cmake"
+    )
 endif()
 
 cmake_path(GET TEST_FILE STEM LAST_ONLY file_stem)
@@ -27,7 +30,7 @@ function(get_file_contents filename outvar)
 endfunction()
 
 function(format_output str outvar)
-    if (str STREQUAL "")
+    if(str STREQUAL "")
         set(str "<empty>")
     endif()
     # Prepend space to each line to make it formatted in the message() output
@@ -40,7 +43,10 @@ function(assert_equal expected actual assert_msg)
     if(NOT expected STREQUAL actual)
         format_output("${expected}" expected_out)
         format_output("${actual}" actual_out)
-        message(SEND_ERROR "${assert_msg}:\nExpected:\n${expected_out}\nActual:\n${actual_out}")
+        message(
+            SEND_ERROR
+            "${assert_msg}:\nExpected:\n${expected_out}\nActual:\n${actual_out}"
+        )
         set(has_errors TRUE PARENT_SCOPE)
     endif()
 endfunction()

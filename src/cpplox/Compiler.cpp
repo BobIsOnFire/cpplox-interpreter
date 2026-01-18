@@ -590,7 +590,7 @@ private:
         case TokenType::LessEqual: emit_bytes(OpCode::Greater, OpCode::Not); break;
 
         case TokenType::Plus: emit_byte(OpCode::Add); break;
-        case TokenType::Minus: emit_byte(OpCode::Substract); break;
+        case TokenType::Minus: emit_byte(OpCode::Subtract); break;
         case TokenType::Star: emit_byte(OpCode::Multiply); break;
         case TokenType::Slash: emit_byte(OpCode::Divide); break;
         default: m_parser.error("Unknown binary operand.");
@@ -843,12 +843,10 @@ private:
         FunctionCompiler compiler = end_function();
         emit_bytes(
                 OpCode::Closure,
-                make_constant(
-                        FunctionReference{
-                                .name = std::string{compiler.code.get_name()},
-                                .sloc = compiler.code.get_location(),
-                        }
-                )
+                make_constant(FunctionReference{
+                        .name = std::string{compiler.code.get_name()},
+                        .sloc = compiler.code.get_location(),
+                })
         );
 
         for (const auto & upvalue : compiler.upvalues) {

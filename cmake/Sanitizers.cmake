@@ -2,7 +2,11 @@ option(ENABLE_ADDRESS_SANITIZER "Enable LLVM AddressSanitizer" OFF)
 option(ENABLE_LEAK_SANITIZER "Enable LLVM LeakSanitizer" OFF)
 option(ENABLE_MEMORY_SANITIZER "Enable LLVM MemorySanitizer" OFF)
 option(ENABLE_THREAD_SANITIZER "Enable LLVM ThreadSanitizer" OFF)
-option(ENABLE_UNDEFINED_BEHAVIOUR_SANITIZER "Enable LLVM UndefinedBehaviourSanitizer" OFF)
+option(
+    ENABLE_UNDEFINED_BEHAVIOUR_SANITIZER
+    "Enable LLVM UndefinedBehaviourSanitizer"
+    OFF
+)
 
 set(sanitizer_flags)
 if(ENABLE_ADDRESS_SANITIZER)
@@ -30,7 +34,5 @@ if(sanitizer_flags)
         $<$<CONFIG:DEBUG>:-fno-omit-frame-pointer>
         $<$<CONFIG:DEBUG>:-O1>
     )
-    add_link_options(
-        $<$<CONFIG:DEBUG>:-fsanitize=${sanitizer_flags_str}>
-    )
+    add_link_options($<$<CONFIG:DEBUG>:-fsanitize=${sanitizer_flags_str}>)
 endif()

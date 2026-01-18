@@ -39,7 +39,7 @@ export enum class OpCode : Byte {
     Less,
     // Binary ops
     Add,
-    Substract,
+    Subtract,
     Multiply,
     Divide,
     // Unary ops

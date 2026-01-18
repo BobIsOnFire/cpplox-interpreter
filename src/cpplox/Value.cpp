@@ -84,9 +84,8 @@ auto Value::operator==(const Value & other) const -> bool
 
 } // namespace cpplox
 
-auto std::formatter<cpplox::Value>::format(
-        const cpplox::Value & value, std::format_context & ctx
-) const -> std::format_context::iterator
+auto std::formatter<cpplox::Value>::format(const cpplox::Value & value, std::format_context & ctx)
+        const -> std::format_context::iterator
 {
     switch (value.get_type()) {
     case cpplox::Value::ValueType::Boolean:

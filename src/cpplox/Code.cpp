@@ -20,4 +20,4 @@ auto Code::add_constant(CompiledValue value) -> std::size_t
     return m_constants.size() - 1;
 }
 
-}
+} // namespace cpplox

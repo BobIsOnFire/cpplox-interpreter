@@ -307,7 +307,7 @@ private:
         if constexpr (op == OpCode::Add) {
             result = Value::number(lhs + rhs);
         }
-        if constexpr (op == OpCode::Substract) {
+        if constexpr (op == OpCode::Subtract) {
             result = Value::number(lhs - rhs);
         }
         if constexpr (op == OpCode::Multiply) {
@@ -700,7 +700,7 @@ private:
                 }
                 break;
             }
-            case Substract: op_result = binary_op<Substract>(); break;
+            case Subtract: op_result = binary_op<Subtract>(); break;
             case Multiply: op_result = binary_op<Multiply>(); break;
             case Divide: op_result = binary_op<Divide>(); break;
             // Unary ops

@@ -14,7 +14,7 @@ set(CMAKE_CXX_MODULE_STD 1)
 project(modules CXX)
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL Linux)
-  message(FATAL_ERROR "This project can only be built on Linux.")
+    message(FATAL_ERROR "This project can only be built on Linux.")
 endif()
 
 # Additional compile/link flags
@@ -30,4 +30,3 @@ add_subdirectory(src)
 
 enable_testing()
 add_subdirectory(tests)
-
