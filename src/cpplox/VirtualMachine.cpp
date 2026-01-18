@@ -45,7 +45,8 @@ auto object_size(Obj::ObjType type) -> std::size_t
     }
 }
 
-template <class... Ts> struct overloaded : Ts...
+template <class... Ts>
+struct overloaded : Ts...
 {
     using Ts::operator()...;
 };
@@ -241,7 +242,8 @@ private:
         return static_cast<DoubleByte>(read_byte() << BYTE_DIGITS) | read_byte();
     }
 
-    template <typename... Args> auto runtime_error(std::format_string<Args...> fmt, Args &&... args)
+    template <typename... Args>
+    auto runtime_error(std::format_string<Args...> fmt, Args &&... args)
     {
         std::print(std::cerr, "runtime error: ");
         std::println(std::cerr, fmt, std::forward<Args>(args)...);
@@ -287,7 +289,8 @@ private:
         return m_stack[m_stack.size() - 1 - distance];
     }
 
-    template <OpCode op> auto binary_op() -> InterpretResult
+    template <OpCode op>
+    auto binary_op() -> InterpretResult
     {
         if (!peek_value(0).is_number() || !peek_value(1).is_number()) {
             runtime_error("Operands must be numbers.");

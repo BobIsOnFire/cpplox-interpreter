@@ -232,7 +232,8 @@ private:
     auto emit_byte(Byte byte) -> void { current_code().write(byte, m_op_sloc); }
     auto emit_byte(OpCode op) -> void { current_code().write(op, m_op_sloc); }
 
-    template <typename ByteT, typename... Bytes> auto emit_bytes(ByteT byte, Bytes... bytes) -> void
+    template <typename ByteT, typename... Bytes>
+    auto emit_bytes(ByteT byte, Bytes... bytes) -> void
     {
         emit_byte(byte);
         if constexpr (sizeof...(bytes) > 0) {

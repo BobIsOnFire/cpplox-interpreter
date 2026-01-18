@@ -17,7 +17,8 @@ export struct SourceLocation
 
 } // namespace cpplox
 
-template <> struct std::hash<cpplox::SourceLocation>
+template <>
+struct std::hash<cpplox::SourceLocation>
 {
     auto operator()(const cpplox::SourceLocation & sloc) const -> std::size_t
     {

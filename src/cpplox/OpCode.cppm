@@ -63,6 +63,7 @@ export enum class OpCode : Byte {
 
 } // namespace cpplox
 
-template <> struct std::formatter<cpplox::OpCode> : cpplox::EnumFormatter<cpplox::OpCode>
+template <>
+struct std::formatter<cpplox::OpCode> : cpplox::EnumFormatter<cpplox::OpCode>
 {
 };

@@ -98,7 +98,8 @@ struct std::formatter<cpplox::Value::ValueType> : cpplox::EnumFormatter<cpplox::
 {
 };
 
-template <> struct std::formatter<cpplox::Value> : std::formatter<std::string_view>
+template <>
+struct std::formatter<cpplox::Value> : std::formatter<std::string_view>
 {
     auto format(const cpplox::Value & value, std::format_context & ctx) const
             -> std::format_context::iterator;

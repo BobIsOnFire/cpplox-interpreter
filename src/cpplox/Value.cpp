@@ -9,7 +9,8 @@ namespace cpplox {
 
 namespace {
 
-template <Obj::ObjType type> auto value_is_obj_type(Value value) -> bool
+template <Obj::ObjType type>
+auto value_is_obj_type(Value value) -> bool
 {
     return value.is_obj() && value.as_obj()->get_type() == type;
 }

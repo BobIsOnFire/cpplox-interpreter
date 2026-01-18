@@ -9,7 +9,8 @@ namespace cpplox {
 export template <typename T>
 concept IsEnum = std::is_enum_v<T>;
 
-export template <IsEnum E> struct EnumFormatter : std::formatter<std::string_view>
+export template <IsEnum E>
+struct EnumFormatter : std::formatter<std::string_view>
 {
     auto format(const E & e, std::format_context & ctx) const
     {

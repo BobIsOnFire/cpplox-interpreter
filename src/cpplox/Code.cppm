@@ -38,17 +38,20 @@ public:
     [[nodiscard]] constexpr auto get_name() const -> std::string_view { return m_name; }
     [[nodiscard]] constexpr auto get_location() const -> SourceLocation { return m_sloc; }
 
-    template <class Self> [[nodiscard]] auto get_chunk(this Self && self) -> auto &&
+    template <class Self>
+    [[nodiscard]] auto get_chunk(this Self && self) -> auto &&
     {
         return std::forward<Self>(self).m_chunk;
     }
 
-    template <class Self> [[nodiscard]] auto arity(this Self && self) -> auto &&
+    template <class Self>
+    [[nodiscard]] auto arity(this Self && self) -> auto &&
     {
         return std::forward<Self>(self).m_arity;
     }
 
-    template <class Self> [[nodiscard]] auto upvalue_count(this Self && self) -> auto &&
+    template <class Self>
+    [[nodiscard]] auto upvalue_count(this Self && self) -> auto &&
     {
         return std::forward<Self>(self).m_upvalue_count;
     }

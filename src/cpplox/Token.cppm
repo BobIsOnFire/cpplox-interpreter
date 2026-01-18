@@ -68,6 +68,7 @@ export struct Token
 
 } // namespace cpplox
 
-template <> struct std::formatter<cpplox::TokenType> : cpplox::EnumFormatter<cpplox::TokenType>
+template <>
+struct std::formatter<cpplox::TokenType> : cpplox::EnumFormatter<cpplox::TokenType>
 {
 };
