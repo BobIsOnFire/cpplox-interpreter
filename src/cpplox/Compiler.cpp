@@ -860,9 +860,9 @@ private:
                 if (current_function().code.arity() > MAX_ARITY) {
                     m_parser.error_at_current("Cannot have more than 255 parameters.");
                 }
-                // TODO: const function parameters?
-                Byte constant = parse_variable(/* is_const = */ false, "Expect parameter name.");
-                define_variable(constant, /* is_const = */ false);
+                bool is_const = m_parser.match(TokenType::Const);
+                Byte constant = parse_variable(is_const, "Expect parameter name.");
+                define_variable(constant, is_const);
             } while (m_parser.match(TokenType::Comma));
         }
         m_parser.consume(TokenType::RightParenthesis, "Expect ')' after parameters.");

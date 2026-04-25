@@ -1,0 +1,6 @@
+fun f(a, const b) {
+  b = 5; // Error at '=': Cannot assign to const variable.
+  print a + b;
+}
+
+f(1, 2);
