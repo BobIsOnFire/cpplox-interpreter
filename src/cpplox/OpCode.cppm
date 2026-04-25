@@ -23,7 +23,8 @@ export enum class OpCode : Byte {
     False,
     // Value manipulators
     Pop,
-    DefineGlobal,
+    DefineGlobalConst,
+    DefineGlobalVar,
     GetGlobal,
     GetLocal,
     GetProperty,

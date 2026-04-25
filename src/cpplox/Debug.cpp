@@ -104,7 +104,8 @@ auto disassemble_instruction(const Chunk & chunk, std::size_t offset) -> std::si
     case False: return simple("OP_FALSE", offset);
     // Value manipulators
     case Pop: return simple("OP_POP", offset);
-    case DefineGlobal: return constant("OP_DEFINE_GLOBAL", chunk, offset);
+    case DefineGlobalConst: return constant("OP_DEFINE_GLOBAL_CONST", chunk, offset);
+    case DefineGlobalVar: return constant("OP_DEFINE_GLOBAL_VAR", chunk, offset);
     case GetGlobal: return constant("OP_GET_GLOBAL", chunk, offset);
     case GetLocal: return byte("OP_GET_LOCAL", chunk, offset);
     case GetProperty: return constant("OP_GET_PROPERTY", chunk, offset);

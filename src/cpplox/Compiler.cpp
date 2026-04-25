@@ -164,14 +164,16 @@ private:
     struct Local
     {
         Token name;
-        int depth = 0;
-        bool is_captured = false;
+        int depth;
+        bool is_captured;
+        bool is_const;
     };
 
     struct Upvalue
     {
         Byte index;
         bool is_local;
+        bool is_const;
     };
 
     enum class FunctionType : std::uint8_t
@@ -326,6 +328,7 @@ private:
                     },
                     .depth = 0,
                     .is_captured = false,
+                    .is_const = true,
                 },
             },
             .upvalues = {},
@@ -374,7 +377,7 @@ private:
         };
     }
 
-    auto add_local(const Token & name) -> void
+    auto add_local(const Token & name, bool is_const) -> void
     {
         if (current_function().locals.size() > BYTE_MAX) {
             m_parser.error("Too many local variables in function.");
@@ -385,11 +388,12 @@ private:
                 .name = name,
                 .depth = -1,
                 .is_captured = false,
+                .is_const = is_const,
         });
     }
 
     auto resolve_local(FunctionCompiler & compiler, const Token & name)
-            -> std::optional<std::size_t>
+            -> std::optional<std::pair<std::size_t, Local &>>
     {
         // FIXME: UHH why `vector | views::reverse` doesn't work??? libstdc++ wtf???
         // TODO: use views::enumerate once it's available in libc++
@@ -399,38 +403,40 @@ private:
                 if (local.depth == -1) {
                     m_parser.error("Cannot read local variable in its own initializer.");
                 }
-                return idx;
+                return {{idx, local}};
             }
         }
         return std::nullopt;
     }
 
-    auto resolve_local(const Token & name) -> std::optional<std::size_t>
+    auto resolve_local(const Token & name) -> std::optional<std::pair<std::size_t, Local &>>
     {
         return resolve_local(current_function(), name);
     }
 
-    auto add_upvalue(FunctionCompiler & compiler, Byte index, bool is_local) -> std::size_t
+    auto add_upvalue(FunctionCompiler & compiler, Byte index, bool is_local, bool is_const)
+            -> std::pair<std::size_t, Upvalue &>
     {
         // TODO: use views::enumerate once it's available in libc++
         for (const auto & [idx, upvalue] :
              std::views::zip(std::views::iota(0UZ), compiler.upvalues)) {
             if (upvalue.index == index && upvalue.is_local == is_local) {
-                return idx;
+                return {idx, upvalue};
             }
         }
 
         if (compiler.upvalues.size() >= BYTE_MAX) {
             m_parser.error("Too many closure variables in function.");
-            return 0;
+            return {0, compiler.upvalues[0]};
         }
 
-        compiler.upvalues.push_back({.index = index, .is_local = is_local});
-        return compiler.code.upvalue_count()++;
+        compiler.upvalues.push_back({.index = index, .is_local = is_local, .is_const = is_const});
+        return {compiler.code.upvalue_count()++, compiler.upvalues.back()};
     }
 
     // NOLINTNEXTLINE(misc-no-recursion)
-    auto resolve_upvalue(std::size_t comp_idx, const Token & name) -> std::optional<std::size_t>
+    auto resolve_upvalue(std::size_t comp_idx, const Token & name)
+            -> std::optional<std::pair<std::size_t, Upvalue &>>
     {
         if (comp_idx == 0) {
             return std::nullopt;
@@ -439,21 +445,27 @@ private:
         auto & current = m_function_compilers[comp_idx];
         auto & enclosing = m_function_compilers[comp_idx - 1];
 
-        auto local = resolve_local(enclosing, name);
-        if (local.has_value()) {
-            enclosing.locals[local.value()].is_captured = true;
-            return add_upvalue(current, static_cast<Byte>(local.value()), /* is_local = */ true);
+        auto maybe_local = resolve_local(enclosing, name);
+        if (maybe_local.has_value()) {
+            auto & [idx, local] = maybe_local.value();
+            local.is_captured = true;
+            return add_upvalue(
+                    current, static_cast<Byte>(idx), /* is_local = */ true, local.is_const
+            );
         }
 
-        auto upvalue = resolve_upvalue(comp_idx - 1, name);
-        if (upvalue.has_value()) {
-            return add_upvalue(current, static_cast<Byte>(upvalue.value()), /* is_local = */ false);
+        auto maybe_upvalue = resolve_upvalue(comp_idx - 1, name);
+        if (maybe_upvalue.has_value()) {
+            auto & [idx, upvalue] = maybe_upvalue.value();
+            return add_upvalue(
+                    current, static_cast<Byte>(idx), /* is_local = */ false, upvalue.is_const
+            );
         }
 
         return std::nullopt;
     }
 
-    auto resolve_upvalue(const Token & name) -> std::optional<std::size_t>
+    auto resolve_upvalue(const Token & name) -> std::optional<std::pair<std::size_t, Upvalue &>>
     {
         return resolve_upvalue(m_function_compilers.size() - 1, name);
     }
@@ -466,7 +478,7 @@ private:
         current_function().locals.back().depth = current_function().scope_depth;
     }
 
-    auto declare_variable() -> void
+    auto declare_variable(bool is_const) -> void
     {
         if (!is_scope_local()) {
             return;
@@ -483,13 +495,13 @@ private:
             }
         }
 
-        add_local(m_parser.get_previous());
+        add_local(m_parser.get_previous(), is_const);
     }
 
-    auto parse_variable(std::string_view error_message) -> Byte
+    auto parse_variable(bool is_const, std::string_view error_message) -> Byte
     {
         m_parser.consume(TokenType::Identifier, error_message);
-        declare_variable();
+        declare_variable(is_const);
 
         if (is_scope_local()) {
             return 0;
@@ -498,13 +510,13 @@ private:
         return identifier_constant(m_parser.get_previous());
     }
 
-    auto define_variable(Byte global) -> void
+    auto define_variable(Byte global, bool is_const) -> void
     {
         if (is_scope_local()) {
             mark_initialized();
             return;
         }
-        emit_bytes(OpCode::DefineGlobal, global);
+        emit_bytes(is_const ? OpCode::DefineGlobalConst : OpCode::DefineGlobalVar, global);
     }
 
     // *** Expression Parser ***
@@ -641,24 +653,34 @@ private:
         OpCode get_op = OpCode::GetGlobal;
         OpCode set_op = OpCode::SetGlobal;
         Byte arg = 0;
+        bool is_const = false;
 
         if (auto local_pos = resolve_local(name); local_pos.has_value()) {
+            auto & [pos, local] = local_pos.value();
             get_op = OpCode::GetLocal;
             set_op = OpCode::SetLocal;
-            arg = static_cast<Byte>(local_pos.value());
+            arg = static_cast<Byte>(pos);
+            is_const = local.is_const;
         }
         else if (auto upvalue_pos = resolve_upvalue(name); upvalue_pos.has_value()) {
+            auto & [pos, upvalue] = upvalue_pos.value();
             get_op = OpCode::GetUpvalue;
             set_op = OpCode::SetUpvalue;
-            arg = static_cast<Byte>(upvalue_pos.value());
+            arg = static_cast<Byte>(pos);
+            is_const = upvalue.is_const;
         }
         else {
             get_op = OpCode::GetGlobal;
             set_op = OpCode::SetGlobal;
             arg = identifier_constant(name);
+            // Global const assignment is checked at runtime
+            is_const = false;
         }
 
         if (ctx.can_assign && m_parser.match(TokenType::Equal)) {
+            if (is_const) {
+                m_parser.error("Cannot assign to const variable.");
+            }
             expression();
             emit_bytes(set_op, arg);
         }
@@ -762,11 +784,12 @@ private:
 
     // It's a recursive descent parser, duh!
     // NOLINTBEGIN(misc-no-recursion)
-    auto var_declaration() -> void
+    auto var_declaration(bool is_const) -> void
     {
-        Byte global = parse_variable("Expect variable name.");
+        Byte global = parse_variable(is_const, "Expect variable name.");
 
-        if (m_parser.match(TokenType::Equal)) {
+        bool has_initializer = m_parser.match(TokenType::Equal);
+        if (has_initializer) {
             expression();
         }
         else {
@@ -774,7 +797,11 @@ private:
         }
         m_parser.consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
 
-        define_variable(global);
+        if (is_const && !has_initializer) {
+            m_parser.error("Const variable must have an initializer.");
+        }
+
+        define_variable(global, is_const);
     }
 
     auto print_statement() -> void
@@ -833,8 +860,9 @@ private:
                 if (current_function().code.arity() > MAX_ARITY) {
                     m_parser.error_at_current("Cannot have more than 255 parameters.");
                 }
-                Byte constant = parse_variable("Expect parameter name.");
-                define_variable(constant);
+                // TODO: const function parameters?
+                Byte constant = parse_variable(/* is_const = */ false, "Expect parameter name.");
+                define_variable(constant, /* is_const = */ false);
             } while (m_parser.match(TokenType::Comma));
         }
         m_parser.consume(TokenType::RightParenthesis, "Expect ')' after parameters.");
@@ -873,10 +901,10 @@ private:
         m_parser.consume(TokenType::Identifier, "Expect class name.");
         Token class_name = m_parser.get_previous();
         Byte name_constant = identifier_constant(m_parser.get_previous());
-        declare_variable();
+        declare_variable(/* is_const = */ true);
 
         emit_bytes(OpCode::Class, name_constant);
-        define_variable(name_constant);
+        define_variable(name_constant, /* is_const = */ true);
 
         m_class_compilers.push_back({
                 .name = class_name.lexeme,
@@ -892,8 +920,8 @@ private:
             }
 
             begin_scope();
-            add_local(synthetic_token("super"));
-            define_variable(0);
+            add_local(synthetic_token("super"), /* is_const = */ true);
+            define_variable(0, /* is_const = */ true);
 
             named_variable(class_name, {.can_assign = false});
             emit_byte(OpCode::Inherit);
@@ -916,12 +944,12 @@ private:
 
     auto fun_declaration() -> void
     {
-        Byte global = parse_variable("Expect function name.");
+        Byte global = parse_variable(/* is_const = */ true, "Expect function name.");
         mark_initialized();
 
         function(FunctionType::Function);
 
-        define_variable(global);
+        define_variable(global, /* is_const = */ true);
     }
 
     auto if_statement() -> void
@@ -976,7 +1004,10 @@ private:
             // No initializer
         }
         else if (m_parser.match(TokenType::Var)) {
-            var_declaration();
+            var_declaration(/* is_const = */ false);
+        }
+        else if (m_parser.match(TokenType::Const)) {
+            var_declaration(/* is_const = */ true);
         }
         else {
             expression_statement();
@@ -1062,7 +1093,10 @@ private:
             fun_declaration();
         }
         else if (m_parser.match(TokenType::Var)) {
-            var_declaration();
+            var_declaration(/* is_const = */ false);
+        }
+        else if (m_parser.match(TokenType::Const)) {
+            var_declaration(/* is_const = */ true);
         }
         else {
             statement();

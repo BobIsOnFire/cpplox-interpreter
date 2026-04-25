@@ -1,0 +1,2 @@
+fun foo() {}
+foo = nil; // runtime error: Cannot assign to const variable 'foo'.

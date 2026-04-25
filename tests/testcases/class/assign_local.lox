@@ -1,0 +1,4 @@
+{
+    class Foo {}
+    Foo = nil; // Error at '=': Cannot assign to const variable.
+}

@@ -1,0 +1,8 @@
+{
+  const local = "local";
+  fun f() {
+    print local;
+    local = "in closure"; // Error at '=': Cannot assign to const variable.
+    print local;
+  }
+}

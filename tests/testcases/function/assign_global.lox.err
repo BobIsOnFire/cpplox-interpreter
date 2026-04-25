@@ -1,0 +1,2 @@
+runtime error: Cannot assign to const variable 'foo'.
+  [2:1] in script

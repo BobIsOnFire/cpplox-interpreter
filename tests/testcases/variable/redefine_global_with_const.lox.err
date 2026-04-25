@@ -1,0 +1,2 @@
+runtime error: Cannot define global const variable 'a', it is already defined as mutable.
+  [2:1] in script

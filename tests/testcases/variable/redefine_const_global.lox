@@ -1,0 +1,2 @@
+const a = "global const";
+var a = "global"; // runtime error: Cannot redefine global const variable 'a'.

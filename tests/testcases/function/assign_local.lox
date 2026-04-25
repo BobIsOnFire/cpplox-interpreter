@@ -1,0 +1,4 @@
+{
+    fun foo() {}
+    foo = nil; // Error at '=': Cannot assign to const variable.
+}

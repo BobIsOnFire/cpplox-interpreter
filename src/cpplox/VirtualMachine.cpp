@@ -55,6 +55,13 @@ struct overloaded : Ts...
 
 class VirtualMachine : public IVirtualMachine
 {
+private:
+    struct Global
+    {
+        Value value;
+        bool is_const;
+    };
+
 public:
     VirtualMachine()
     {
@@ -189,8 +196,8 @@ private:
         for (auto * upvalue : m_open_upvalues) {
             tracer.trace(upvalue);
         }
-        for (const auto & [_, value] : m_globals) {
-            tracer.trace(value);
+        for (const auto & [_, global] : m_globals) {
+            tracer.trace(global.value);
         }
 
         // Sweep
@@ -485,6 +492,38 @@ private:
         pop_value(); // once! leave class in place for consequent methods
     }
 
+    auto define_global(const std::string & name, bool is_const) -> InterpretResult
+    {
+        // FIXME: is there a way to get rid of copy on key insert? Key will surely live as
+        // long as VM lives
+        auto it = m_globals.find(name);
+        if (it != m_globals.end()) {
+            if (it->second.is_const) {
+                // Allowing to redefine a const variable would circumvent constness checks as it
+                // basically allows to provide const variable with a new value
+                runtime_error("Cannot redefine global const variable '{}'.", name);
+                return InterpretResult::RuntimeError;
+            }
+            if (is_const) {
+                // If mutable is redefined as const, all code that is later called to write into it
+                // would result in runtime failure
+                runtime_error(
+                        "Cannot define global const variable '{}', it is already defined as "
+                        "mutable.",
+                        name
+                );
+                return InterpretResult::RuntimeError;
+            }
+            // Mutable redefined with another mutable, just treat it as regular assignment
+            it->second.value = peek_value();
+        }
+        else {
+            m_globals.emplace(name, Global{.value = peek_value(), .is_const = is_const});
+        }
+        pop_value();
+        return InterpretResult::Ok;
+    }
+
     /*** Code loading helpers ***/
 
     auto define_native(std::string_view name, Value::NativeFn callable) -> void
@@ -571,18 +610,18 @@ private:
             case False: push_value(Value::boolean(false)); break;
             // Value manipulators
             case Pop: pop_value(); break;
-            case DefineGlobal: {
-                const std::string & name = read_constant().as_string();
-                // FIXME: is there a way to get rid of copy on key insert? Key will surely live as
-                // long as VM lives
-                auto it = m_globals.find(name);
-                if (it != m_globals.end()) {
-                    it->second = peek_value();
+            case DefineGlobalConst: {
+                auto result = define_global(read_constant().as_string(), /* is_const = */ true);
+                if (result != InterpretResult::Ok) {
+                    return result;
                 }
-                else {
-                    m_globals.emplace(name, peek_value());
+                break;
+            }
+            case DefineGlobalVar: {
+                auto result = define_global(read_constant().as_string(), /* is_const = */ false);
+                if (result != InterpretResult::Ok) {
+                    return result;
                 }
-                pop_value();
                 break;
             }
             case GetGlobal: {
@@ -592,7 +631,7 @@ private:
                     runtime_error("Undefined variable '{}'.", name);
                     return InterpretResult::RuntimeError;
                 }
-                push_value(it->second);
+                push_value(it->second.value);
                 break;
             }
             case GetLocal: {
@@ -643,7 +682,11 @@ private:
                     runtime_error("Undefined variable '{}'.", name);
                     return InterpretResult::RuntimeError;
                 }
-                it->second = peek_value();
+                if (it->second.is_const) {
+                    runtime_error("Cannot assign to const variable '{}'.", name);
+                    return InterpretResult::RuntimeError;
+                }
+                it->second.value = peek_value();
                 break;
             }
             case SetLocal: {
@@ -841,7 +884,7 @@ private:
     beman::inplace_vector::inplace_vector<CallFrame, FRAMES_MAX> m_frames;
     beman::inplace_vector::inplace_vector<Value, STACK_MAX> m_stack;
     std::vector<Obj *> m_objects;
-    std::unordered_map<std::string, Value> m_globals;
+    std::unordered_map<std::string, Global> m_globals;
     std::list<ObjUpvalue *> m_open_upvalues;
 
     std::size_t m_bytes_allocated = 0;
