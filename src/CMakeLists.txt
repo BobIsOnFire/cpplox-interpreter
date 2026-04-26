@@ -1,20 +1,11 @@
 find_package(Python3 REQUIRED)
 
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/Expr.cppm
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/Grammar.cppm
     COMMAND
-        Python3::Interpreter grammar/generate.py grammar/expressions.yaml
-        grammar/Expr.cppm.j2 ${CMAKE_CURRENT_BINARY_DIR}/Expr.cppm
-    DEPENDS grammar/generate.py grammar/expressions.yaml grammar/Expr.cppm.j2
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/Stmt.cppm
-    COMMAND
-        Python3::Interpreter grammar/generate.py grammar/statements.yaml
-        grammar/Stmt.cppm.j2 ${CMAKE_CURRENT_BINARY_DIR}/Stmt.cppm
-    DEPENDS grammar/generate.py grammar/statements.yaml grammar/Stmt.cppm.j2
+        Python3::Interpreter grammar/generate.py grammar/grammar.yaml
+        grammar/Grammar.cppm.j2 ${CMAKE_CURRENT_BINARY_DIR}/Grammar.cppm
+    DEPENDS grammar/generate.py grammar/grammar.yaml grammar/Grammar.cppm.j2
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
@@ -26,8 +17,7 @@ target_sources(
         FILE_SET cxx_modules
         TYPE CXX_MODULES
         FILES
-            ${CMAKE_CURRENT_BINARY_DIR}/Expr.cppm
-            ${CMAKE_CURRENT_BINARY_DIR}/Stmt.cppm
+            ${CMAKE_CURRENT_BINARY_DIR}/Grammar.cppm
             cpplox/Chunk.cppm
             cpplox/Code.cppm
             cpplox/Compiler.cppm

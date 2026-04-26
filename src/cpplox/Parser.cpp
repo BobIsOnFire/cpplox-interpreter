@@ -2,8 +2,8 @@ module cpplox;
 
 import std;
 
+import :Grammar;
 import :Scanner;
-import :Stmt;
 import :Token;
 
 using enum cpplox::TokenType;

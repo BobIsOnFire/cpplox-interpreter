@@ -2,7 +2,7 @@ export module cpplox:Parser;
 
 import std;
 
-import :Stmt;
+import :Grammar;
 
 namespace cpplox {
 

@@ -1,0 +1,110 @@
+grammar:
+
+  expressions:
+
+  - type: Assign
+    params:
+    - { name: name, type: cpplox::Token }
+    - { name: value }
+
+  - type: Binary
+    params:
+    - { name: left }
+    - { name: op, type: cpplox::Token }
+    - { name: right }
+
+  - type: Call
+    params:
+    - { name: callee }
+    - { name: paren, type: cpplox::Token }
+    - { name: args, type: std::vector<cpplox::ExprPtr> }
+
+  - type: Get
+    params:
+    - { name: object }
+    - { name: name, type: cpplox::Token }
+
+  - type: Grouping
+    params:
+    - { name: expr }
+
+  - type: Literal
+    params:
+    - { name: value, type: cpplox::Token }
+
+  - type: Logical
+    params:
+    - { name: left }
+    - { name: op, type: cpplox::Token }
+    - { name: right }
+
+  - type: Set
+    params:
+    - { name: object }
+    - { name: name, type: cpplox::Token }
+    - { name: value }
+
+  - type: Super
+    params:
+    - { name: keyword, type: cpplox::Token }
+    - { name: method, type: cpplox::Token }
+
+  - type: This
+    params:
+    - { name: keyword, type: cpplox::Token }
+
+  - type: Unary
+    params:
+    - { name: op, type: cpplox::Token }
+    - { name: right }
+
+  - type: Variable
+    params:
+    - { name: name, type: cpplox::Token }
+
+  statements:
+
+  - type: Block
+    params:
+    - { name: stmts, type: std::vector<cpplox::StmtPtr> }
+
+  - type: Class
+    params:
+    - { name: name, type: cpplox::Token }
+    - { name: super, type: std::optional<cpplox::expr::Variable> }
+    - { name: methods, type: std::vector<cpplox::stmt::Function> }
+
+  - type: Expression
+    params:
+    - { name: expr, type: cpplox::ExprPtr }
+
+  - type: Function
+    params:
+    - { name: name, type: cpplox::Token }
+    - { name: params, type: std::vector<cpplox::Token> }
+    - { name: stmts, type: std::vector<cpplox::StmtPtr> }
+
+  - type: If
+    params:
+    - { name: condition, type: cpplox::ExprPtr }
+    - { name: then_branch }
+    - { name: else_branch, type: std::optional<cpplox::StmtPtr> }
+
+  - type: Print
+    params:
+    - { name: expr, type: cpplox::ExprPtr }
+
+  - type: Return
+    params:
+    - { name: keyword, type: cpplox::Token }
+    - { name: value, type: std::optional<cpplox::ExprPtr> }
+
+  - type: Var
+    params:
+    - { name: name, type: cpplox::Token }
+    - { name: init, type: std::optional<cpplox::ExprPtr> }
+
+  - type: While
+    params:
+    - { name: condition, type: cpplox::ExprPtr }
+    - { name: body }
