@@ -1,9 +1,8 @@
-module cpplox:Parser;
+module cpplox;
 
 import std;
 
-import :Diagnostics;
-import :ParserError;
+import :Scanner;
 import :Stmt;
 import :Token;
 
@@ -24,8 +23,18 @@ constexpr const std::size_t MAX_ARGS_COUNT = 255;
 
 namespace cpplox {
 
-export class Parser
+class Parser
 {
+public:
+    class ParserError : public std::runtime_error
+    {
+    public:
+        explicit ParserError(std::string_view what = "")
+            : std::runtime_error(what.data())
+        {
+        }
+    };
+
 public:
     explicit Parser(std::span<const Token> tokens)
         : m_tokens(tokens)
@@ -45,10 +54,7 @@ public:
     }
 
 private:
-    [[nodiscard]] auto is_at_end() const -> bool
-    {
-        return peek().get_type() == TokenType::EndOfFile;
-    }
+    [[nodiscard]] auto is_at_end() const -> bool { return peek().type == TokenType::EndOfFile; }
 
     [[nodiscard]] auto peek() const -> const Token & { return m_tokens[m_current]; }
 
@@ -68,7 +74,7 @@ private:
             return false;
         }
 
-        return peek().get_type() == type;
+        return peek().type == type;
     }
 
     auto match(TokenType type) -> bool
@@ -92,7 +98,17 @@ private:
 
     auto error(const Token & token, std::string_view message) -> ParserError
     {
-        Diagnostics::instance()->error(token, message);
+        std::print(std::cerr, "[{}:{}] Error", token.sloc.line, token.sloc.column);
+
+        if (token.type == TokenType::EndOfFile) {
+            std::print(std::cerr, " at end");
+        }
+        else if (token.type != TokenType::Error) {
+            std::print(std::cerr, " at '{}'", token.lexeme);
+        }
+
+        std::println(std::cerr, ": {}", message);
+
         return ParserError(message);
     }
 
@@ -101,11 +117,11 @@ private:
         advance();
 
         while (!is_at_end()) {
-            if (previous().get_type() == Semicolon) {
+            if (previous().type == Semicolon) {
                 return;
             }
 
-            switch (peek().get_type()) {
+            switch (peek().type) {
             case Class:
             case Fun:
             case Var:
@@ -131,6 +147,7 @@ private:
         });
     }
 
+    // NOLINTNEXTLINE(misc-no-recursion)
     auto function_node(std::string_view kind) -> stmt::Function
     {
         const auto & name = consume(Identifier, std::format("Expect {} name.", kind));
@@ -143,14 +160,14 @@ private:
                     error(peek(),
                           std::format("Can't have more than {} call arguments.", MAX_ARGS_COUNT));
                 }
-                params.emplace_back(consume(Identifier, "Expect parameter name.").clone());
+                params.emplace_back(consume(Identifier, "Expect parameter name."));
             } while (match(Comma));
         }
         consume(RightParenthesis, "Expect ')' after parameters.");
 
         consume(LeftBrace, std::format("Expect '{{' before {} body.", kind));
         return stmt::Function{
-                .name = name.clone(),
+                .name = name,
                 .params = std::move(params),
                 .stmts = get_block_statements(),
         };
@@ -184,11 +201,10 @@ private:
     {
         const auto & name = consume(Identifier, "Expect class name.");
 
-        auto super = match(Less)
-                ? std::optional(expr::Variable{
-                          .name = consume(Identifier, "Expect superclass name.").clone(),
-                  })
-                : std::nullopt;
+        auto super = match(Less) ? std::optional(expr::Variable{
+                                           .name = consume(Identifier, "Expect superclass name."),
+                                   })
+                                 : std::nullopt;
 
         consume(LeftBrace, "Expect '{' before class body.");
 
@@ -199,7 +215,7 @@ private:
 
         consume(RightBrace, "Expect '}' after class body.");
 
-        return make_unique_stmt<stmt::Class>(name.clone(), std::move(super), std::move(methods));
+        return make_unique_stmt<stmt::Class>(name, super, std::move(methods));
     }
 
     auto function(std::string_view kind) -> StmtPtr
@@ -213,7 +229,7 @@ private:
 
         auto init = match(Equal) ? std::optional(expression()) : std::nullopt;
         consume(Semicolon, "Expect ';' after variable declaration.");
-        return make_unique_stmt<stmt::Var>(name.clone(), std::move(init));
+        return make_unique_stmt<stmt::Var>(name, std::move(init));
     }
 
     auto statement() -> StmtPtr
@@ -248,7 +264,12 @@ private:
                 ? std::nullopt
                 : std::optional(match(Var) ? var_declaration() : expression_statement());
 
-        auto condition = check(Semicolon) ? make_unique_expr<expr::Literal>(true) : expression();
+        auto condition = check(Semicolon) ? make_unique_expr<expr::Literal>(Token{
+                                                    .type = TokenType::True,
+                                                    .lexeme = "true",
+                                                    .sloc = previous().sloc,
+                                            })
+                                          : expression();
         consume(Semicolon, "Expect ';' after 'for' loop condition.");
 
         auto increment = check(RightParenthesis) ? std::nullopt : std::optional(expression());
@@ -314,7 +335,7 @@ private:
         auto value = check(Semicolon) ? std::nullopt : std::optional(expression());
 
         consume(Semicolon, "Expect ';' after return value.");
-        return make_unique_stmt<stmt::Return>(keyword.clone(), std::move(value));
+        return make_unique_stmt<stmt::Return>(keyword, std::move(value));
     }
 
     auto while_statement() -> StmtPtr
@@ -361,11 +382,11 @@ private:
 
             const auto visitor = overloads{
                     [&](expr::Variable & e) {
-                        return make_unique_expr<expr::Assign>(e.name.clone(), std::move(value));
+                        return make_unique_expr<expr::Assign>(e.name, std::move(value));
                     },
                     [&](expr::Get & e) {
                         return make_unique_expr<expr::Set>(
-                                std::move(e.object), std::move(e.name), std::move(value)
+                                std::move(e.object), e.name, std::move(value)
                         );
                     },
                     [&](auto &) {
@@ -384,7 +405,7 @@ private:
     {
         auto expr = expr_and();
         while (match(Or)) {
-            expr = make_unique_expr<expr::Logical>(std::move(expr), previous().clone(), expr_and());
+            expr = make_unique_expr<expr::Logical>(std::move(expr), previous(), expr_and());
         }
         return expr;
     }
@@ -393,7 +414,7 @@ private:
     {
         auto expr = equality();
         while (match(And)) {
-            expr = make_unique_expr<expr::Logical>(std::move(expr), previous().clone(), equality());
+            expr = make_unique_expr<expr::Logical>(std::move(expr), previous(), equality());
         }
         return expr;
     }
@@ -402,9 +423,7 @@ private:
     {
         auto expr = comparison();
         while (match_any(BangEqual, EqualEqual)) {
-            expr = make_unique_expr<expr::Binary>(
-                    std::move(expr), previous().clone(), comparison()
-            );
+            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), comparison());
         }
         return expr;
     }
@@ -413,7 +432,7 @@ private:
     {
         auto expr = term();
         while (match_any(Greater, GreaterEqual, Less, LessEqual)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous().clone(), term());
+            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), term());
         }
         return expr;
     }
@@ -422,7 +441,7 @@ private:
     {
         auto expr = factor();
         while (match_any(Minus, Plus)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous().clone(), factor());
+            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), factor());
         }
         return expr;
     }
@@ -431,7 +450,7 @@ private:
     {
         auto expr = unary();
         while (match_any(Percent, Slash, Star)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous().clone(), unary());
+            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), unary());
         }
         return expr;
     }
@@ -439,7 +458,7 @@ private:
     auto unary() -> ExprPtr
     {
         if (match_any(Bang, Minus)) {
-            return make_unique_expr<expr::Unary>(previous().clone(), unary());
+            return make_unique_expr<expr::Unary>(previous(), unary());
         }
 
         return call();
@@ -454,7 +473,7 @@ private:
             }
             else if (match(Dot)) {
                 const auto & name = consume(Identifier, "Expect property name after '.'.");
-                expr = make_unique_expr<expr::Get>(std::move(expr), name.clone());
+                expr = make_unique_expr<expr::Get>(std::move(expr), name);
             }
             else {
                 break;
@@ -480,43 +499,31 @@ private:
 
         return make_unique_expr<expr::Call>(
                 std::move(callee),
-                consume(RightParenthesis, "Expect ')' after call arguments.").clone(),
+                consume(RightParenthesis, "Expect ')' after call arguments."),
                 std::move(args)
         );
     }
 
     auto primary() -> ExprPtr
     {
-        if (match(False)) {
-            return make_unique_expr<expr::Literal>(false);
-        }
-
-        if (match(True)) {
-            return make_unique_expr<expr::Literal>(true);
-        }
-
-        if (match(Nil)) {
-            return make_unique_expr<expr::Literal>(Token::NullLiteral{});
-        }
-
-        if (match_any(Number, String)) {
-            return make_unique_expr<expr::Literal>(previous().get_literal().clone());
+        if (match_any(False, True, Nil, Number, String)) {
+            return make_unique_expr<expr::Literal>(previous());
         }
 
         if (match(Super)) {
             const auto & keyword = previous();
             consume(Dot, "Expect '.' after 'super'.");
             return make_unique_expr<expr::Super>(
-                    keyword.clone(), consume(Identifier, "Expect superclass method name.").clone()
+                    keyword, consume(Identifier, "Expect superclass method name.")
             );
         }
 
         if (match(This)) {
-            return make_unique_expr<expr::This>(previous().clone());
+            return make_unique_expr<expr::This>(previous());
         }
 
         if (match(Identifier)) {
-            return make_unique_expr<expr::Variable>(previous().clone());
+            return make_unique_expr<expr::Variable>(previous());
         }
 
         if (match(LeftParenthesis)) {
@@ -533,5 +540,22 @@ private:
     std::span<const Token> m_tokens;
     std::size_t m_current = 0;
 };
+
+// TODO: should denote failure, replace with std::expected
+auto parse(std::string_view source) -> std::optional<std::vector<StmtPtr>>
+{
+    ScannerPtr scanner = make_scanner(source);
+    // FIXME: use lazy token scanning
+    std::vector<Token> tokens;
+    while (true) {
+        tokens.push_back(scanner->next_token());
+        if (tokens.back().type == TokenType::EndOfFile) {
+            break;
+        }
+    }
+
+    Parser parser(tokens);
+    return parser.parse();
+}
 
 } // namespace cpplox

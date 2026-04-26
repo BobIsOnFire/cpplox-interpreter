@@ -37,6 +37,7 @@ target_sources(
             cpplox/Object.cppm
             cpplox/ObjReferenceTracer.cppm
             cpplox/OpCode.cppm
+            cpplox/Parser.cppm
             cpplox/Scanner.cppm
             cpplox/SourceLocation.cppm
             cpplox/Token.cppm
@@ -50,6 +51,7 @@ target_sources(
         cpplox/Compiler.cpp
         cpplox/Debug.cpp
         cpplox/ObjReferenceTracer.cpp
+        cpplox/Parser.cpp
         cpplox/Scanner.cpp
         cpplox/Value.cpp
         cpplox/VirtualMachine.cpp
