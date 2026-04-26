@@ -178,6 +178,7 @@ private:
 
     enum class FunctionType : std::uint8_t
     {
+        Anonymous,
         Function,
         Initializer,
         Method,
@@ -315,6 +316,9 @@ private:
     auto make_function(FunctionType type) -> FunctionCompiler
     {
         auto get_name = [type, this] -> std::string {
+            if (type == FunctionType::Anonymous) {
+                return "[anonymous]";
+            }
             if (type == FunctionType::Function) {
                 return std::string{m_parser.get_previous().lexeme};
             }
@@ -629,6 +633,8 @@ private:
         }
     }
 
+    auto fun_ex(ParseContext /* ctx */) -> void { function(FunctionType::Anonymous); }
+
     auto string(ParseContext /* ctx */) -> void
     {
         auto lexeme = m_parser.get_previous().lexeme;
@@ -862,7 +868,11 @@ private:
 
         begin_scope();
 
-        m_parser.consume(TokenType::LeftParenthesis, "Expect '(' after function name.");
+        m_parser.consume(
+                TokenType::LeftParenthesis,
+                type == FunctionType::Anonymous ? "Expect '(' after 'fun'."
+                                                : "Expect '(' after function name."
+        );
         if (!m_parser.check(TokenType::RightParenthesis)) {
             do {
                 current_function().code.arity()++;
@@ -1174,6 +1184,7 @@ private:
         ADD_RULE(Dot,             nullptr,    dot,       Call);
         ADD_RULE(EqualEqual,      nullptr,    binary,    Equality);
         ADD_RULE(False,           literal,    nullptr,   None);
+        ADD_RULE(Fun,             fun_ex,     nullptr,   None);
         ADD_RULE(Greater,         nullptr,    binary,    Comparison);
         ADD_RULE(GreaterEqual,    nullptr,    binary,    Comparison);
         ADD_RULE(Identifier,      variable,   nullptr,   None);
