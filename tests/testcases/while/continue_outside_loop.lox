@@ -1,0 +1,6 @@
+var c = 0;
+while (c < 3) print c = c + 1;
+
+continue; // Error at 'continue': Cannot use 'continue' outside of a loop.
+
+print c;

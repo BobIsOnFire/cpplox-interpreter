@@ -1,0 +1,6 @@
+var c = 0;
+while (c < 3) print c = c + 1;
+
+break; // Error at 'break': Cannot use 'break' outside of a loop.
+
+print c;

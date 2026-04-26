@@ -156,11 +156,20 @@ private:
         auto lexeme = get_lexeme();
         switch (lexeme[0]) {
         case 'a': return check_keyword("and", And);
+        case 'b': return check_keyword("break", Break);
         case 'c':
             if (lexeme.length() > 1) {
                 switch (lexeme[1]) {
                 case 'l': return check_keyword("class", Class);
-                case 'o': return check_keyword("const", Const);
+                case 'o':
+                    if (lexeme.length() > 3 && lexeme[2] == 'n') {
+                        switch (lexeme[3]) {
+                        case 's': return check_keyword("const", Const);
+                        case 't': return check_keyword("continue", Continue);
+                        default: return Identifier;
+                        }
+                    }
+                    return Identifier;
                 default: return Identifier;
                 }
             }

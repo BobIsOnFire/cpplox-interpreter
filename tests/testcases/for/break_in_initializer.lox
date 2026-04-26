@@ -1,0 +1,4 @@
+var i = 0;
+for (break; i < 3; i = i + 1) { // Error at 'break': Expect expression.
+    print i;
+}

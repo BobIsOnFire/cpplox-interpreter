@@ -50,6 +50,7 @@ export enum class OpCode : Byte {
     Print,
     Jump,
     JumpIfFalse,
+    JumpIfFalseAndPop,
     Loop,
     Call,
     Invoke,

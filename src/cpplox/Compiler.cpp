@@ -184,6 +184,12 @@ private:
         Script,
     };
 
+    struct LoopCompiler
+    {
+        std::size_t loop_start;
+        std::vector<std::size_t> loop_breaks;
+    };
+
     struct FunctionCompiler
     {
         Code code;
@@ -191,6 +197,7 @@ private:
 
         std::vector<Local> locals;
         std::vector<Upvalue> upvalues;
+        std::vector<LoopCompiler> loops;
         int scope_depth = 0;
     };
 
@@ -221,6 +228,7 @@ public:
     }
 
 private:
+    [[nodiscard]] auto current_loop() -> LoopCompiler & { return current_function().loops.back(); }
     [[nodiscard]] auto current_function() -> FunctionCompiler &
     {
         return m_function_compilers.back();
@@ -332,6 +340,7 @@ private:
                 },
             },
             .upvalues = {},
+            .loops = {},
             .scope_depth = 0,
         };
     }
@@ -958,15 +967,13 @@ private:
         expression();
         m_parser.consume(TokenType::RightParenthesis, "Expect ')' after condition.");
 
-        std::size_t then_jump = emit_jump(OpCode::JumpIfFalse);
-        emit_byte(OpCode::Pop);
+        std::size_t then_jump = emit_jump(OpCode::JumpIfFalseAndPop);
 
         statement();
 
         std::size_t else_jump = emit_jump(OpCode::Jump);
 
         patch_jump(then_jump);
-        emit_byte(OpCode::Pop);
 
         if (m_parser.match(TokenType::Else)) {
             statement();
@@ -977,19 +984,24 @@ private:
 
     auto while_statement() -> void
     {
-        std::size_t loop_start = current_code().code().size();
+        current_function().loops.push_back(
+                {.loop_start = current_code().code().size(), .loop_breaks = {}}
+        );
 
         m_parser.consume(TokenType::LeftParenthesis, "Expect '(' after 'while'.");
         expression();
         m_parser.consume(TokenType::RightParenthesis, "Expect ')' after condition.");
 
-        std::size_t exit_jump = emit_jump(OpCode::JumpIfFalse);
-        emit_byte(OpCode::Pop);
-        statement();
-        emit_loop(loop_start);
+        current_loop().loop_breaks.push_back(emit_jump(OpCode::JumpIfFalseAndPop));
 
-        patch_jump(exit_jump);
-        emit_byte(OpCode::Pop);
+        statement();
+        emit_loop(current_loop().loop_start);
+
+        for (const auto loop_break : current_loop().loop_breaks) {
+            patch_jump(loop_break);
+        }
+
+        current_function().loops.pop_back();
     }
 
     auto for_statement() -> void
@@ -1013,15 +1025,15 @@ private:
             expression_statement();
         }
 
-        std::size_t loop_start = current_code().code().size();
+        current_function().loops.push_back(
+                {.loop_start = current_code().code().size(), .loop_breaks = {}}
+        );
 
-        std::optional<std::size_t> exit_jump;
         if (!m_parser.match(TokenType::Semicolon)) {
             expression();
             m_parser.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
 
-            exit_jump = emit_jump(OpCode::JumpIfFalse);
-            emit_byte(OpCode::Pop);
+            current_loop().loop_breaks.push_back(emit_jump(OpCode::JumpIfFalseAndPop));
         }
 
         if (!m_parser.match(TokenType::RightParenthesis)) {
@@ -1033,20 +1045,40 @@ private:
             emit_byte(OpCode::Pop);
             m_parser.consume(TokenType::RightParenthesis, "Expect ')' after for clauses.");
 
-            emit_loop(loop_start);
-            loop_start = increment_start;
+            emit_loop(current_loop().loop_start);
+            current_loop().loop_start = increment_start;
             patch_jump(body_jump);
         }
 
         statement();
-        emit_loop(loop_start);
+        emit_loop(current_loop().loop_start);
 
-        if (exit_jump.has_value()) {
-            patch_jump(exit_jump.value());
-            emit_byte(OpCode::Pop);
+        for (const auto loop_break : current_loop().loop_breaks) {
+            patch_jump(loop_break);
         }
 
+        current_function().loops.pop_back();
         end_scope();
+    }
+
+    auto break_statement() -> void
+    {
+        if (current_function().loops.empty()) {
+            m_parser.error("Cannot use 'break' outside of a loop.");
+            return;
+        }
+        m_parser.consume(TokenType::Semicolon, "Expect ';' after 'break'.");
+        current_loop().loop_breaks.push_back(emit_jump(OpCode::Jump));
+    }
+
+    auto continue_statement() -> void
+    {
+        if (current_function().loops.empty()) {
+            m_parser.error("Cannot use 'continue' outside of a loop.");
+            return;
+        }
+        m_parser.consume(TokenType::Semicolon, "Expect ';' after 'continue'.");
+        emit_loop(current_loop().loop_start);
     }
 
     auto statement() -> void
@@ -1068,6 +1100,12 @@ private:
         }
         else if (m_parser.match(TokenType::For)) {
             for_statement();
+        }
+        else if (m_parser.match(TokenType::Break)) {
+            break_statement();
+        }
+        else if (m_parser.match(TokenType::Continue)) {
+            continue_statement();
         }
         else if (m_parser.match(TokenType::LeftBrace)) {
             begin_scope();

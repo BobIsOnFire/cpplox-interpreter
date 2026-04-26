@@ -772,6 +772,14 @@ private:
                 }
                 break;
             }
+            case JumpIfFalseAndPop: {
+                DoubleByte offset = read_double_byte();
+                if (is_falsey(peek_value())) {
+                    std::advance(current_frame().ip, offset);
+                }
+                pop_value();
+                break;
+            }
             case Loop: {
                 DoubleByte offset = read_double_byte();
                 std::advance(current_frame().ip, -static_cast<std::ptrdiff_t>(offset));

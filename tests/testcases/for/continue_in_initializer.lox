@@ -1,0 +1,4 @@
+var i = 0;
+for (continue; i < 3; i = i + 1) { // Error at 'continue': Expect expression.
+    print i;
+}
