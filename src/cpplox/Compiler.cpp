@@ -20,7 +20,6 @@ namespace cpplox {
 
 namespace {
 constexpr const std::size_t MAX_ARITY = 255;
-} // namespace
 
 class Parser
 {
@@ -128,6 +127,8 @@ private:
     // TODO: prevents cascading errors, see error_at. Is there a better way to achieve this?
     bool m_panic_mode = false;
 };
+
+} // namespace
 
 class Compiler
 {

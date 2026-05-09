@@ -9,6 +9,7 @@ import std;
 // TODO: replace with std::inplace_vector (C++26) once it's supported
 import beman.inplace_vector;
 
+import :CodeGen;
 import :Compiler;
 import :Debug;
 import :Object;
@@ -27,6 +28,7 @@ const bool DEBUG_PRINT_CODE = std::getenv("LOX_DEBUG_PRINT_CODE") != nullptr;
 const bool DEBUG_VM_EXECUTION = std::getenv("LOX_DEBUG_VM_EXECUTION") != nullptr;
 const bool DEBUG_RUN_GC_EVERY_TIME = std::getenv("LOX_DEBUG_RUN_GC_EVERY_TIME") != nullptr;
 const bool DEBUG_LOG_GC = std::getenv("LOX_DEBUG_LOG_GC") != nullptr;
+const bool USE_AST_CODEGEN = std::getenv("LOX_USE_AST_CODEGEN") != nullptr;
 
 constexpr const std::size_t GC_HEAP_INITIAL_THRESHOLD = 1024UZ * 1024;
 constexpr const std::size_t GC_HEAP_GROW_FACTOR = 2;
@@ -98,7 +100,7 @@ public:
 
     auto interpret(std::string_view source) -> InterpretResult override
     {
-        auto code = cpplox::compile(source);
+        auto code = USE_AST_CODEGEN ? cpplox::codegen(source) : cpplox::compile(source);
         if (!code.has_value()) {
             return InterpretResult::CompileError;
         }

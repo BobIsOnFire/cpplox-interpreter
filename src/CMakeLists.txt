@@ -20,6 +20,7 @@ target_sources(
             ${CMAKE_CURRENT_BINARY_DIR}/Grammar.cppm
             cpplox/Chunk.cppm
             cpplox/Code.cppm
+            cpplox/CodeGen.cppm
             cpplox/Compiler.cppm
             cpplox/Debug.cppm
             cpplox/EnumFormatter.cppm
@@ -38,6 +39,7 @@ target_sources(
         BASE_DIRS . ${CMAKE_CURRENT_BINARY_DIR}
     PRIVATE
         cpplox/Code.cpp
+        cpplox/CodeGen.cpp
         cpplox/Compiler.cpp
         cpplox/Debug.cpp
         cpplox/ObjReferenceTracer.cpp

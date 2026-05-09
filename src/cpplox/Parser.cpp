@@ -178,6 +178,7 @@ private:
 
     auto declaration() noexcept -> std::optional<StmtPtr>
     {
+        // FIXME: check clox error handling -- can do this without exceptions?
         try {
             if (match(Class)) {
                 return class_declaration();
@@ -258,6 +259,7 @@ private:
 
     auto for_statement() -> StmtPtr
     {
+        // TODO: a separate AST node for 'for' loop instead of desugaring
         consume(LeftParenthesis, "Expect '(' after 'for'.");
 
         auto initializer = match(Semicolon)
