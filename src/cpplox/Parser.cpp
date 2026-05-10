@@ -17,6 +17,34 @@ struct overloads : Ts...
     using Ts::operator()...;
 };
 
+// helper for executing passed lambda at scope exit
+template <typename Fn>
+concept ScopeExitCallable = std::is_invocable_r_v<void, Fn>;
+
+template <ScopeExitCallable Fn>
+class ScopeExit
+{
+public:
+    explicit ScopeExit(Fn && callable)
+        : m_callable(std::move(callable))
+    {
+    }
+
+    ~ScopeExit() noexcept { std::invoke(m_callable); }
+
+    ScopeExit(const ScopeExit &) = delete;
+    ScopeExit(ScopeExit &&) = delete;
+    auto operator=(const ScopeExit &) const -> ScopeExit & = delete;
+    auto operator=(ScopeExit &&) -> ScopeExit & = delete;
+
+private:
+    Fn m_callable;
+};
+
+// It's not possible to use a constexpr function here
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define AT_SCOPE_EXIT(body) ScopeExit se([&]() -> void { body; });
+
 constexpr const std::size_t MAX_ARGS_COUNT = 255;
 
 } // namespace
@@ -137,6 +165,22 @@ private:
         }
     }
 
+    template <class ExprT, class... Args>
+    auto make_unique_expr(Args &&... args) -> ExprPtr
+    {
+        return std::make_unique<Expr>(
+                m_op_sloc, std::in_place_type<ExprT>, std::forward<Args>(args)...
+        );
+    }
+
+    template <class StmtT, class... Args>
+    auto make_unique_stmt(Args &&... args) -> StmtPtr
+    {
+        return std::make_unique<Stmt>(
+                m_op_sloc, std::in_place_type<StmtT>, std::forward<Args>(args)...
+        );
+    }
+
     template <typename... Args>
     auto make_block(Args &&... args) -> StmtPtr
     {
@@ -180,6 +224,10 @@ private:
     {
         // FIXME: check clox error handling -- can do this without exceptions?
         try {
+            auto prev_op_sloc = m_op_sloc;
+            m_op_sloc = peek().sloc;
+            AT_SCOPE_EXIT(m_op_sloc = prev_op_sloc);
+
             if (match(Class)) {
                 return class_declaration();
             }
@@ -235,6 +283,10 @@ private:
 
     auto statement() -> StmtPtr
     {
+        auto prev_op_sloc = m_op_sloc;
+        m_op_sloc = peek().sloc;
+        AT_SCOPE_EXIT(m_op_sloc = prev_op_sloc);
+
         if (match(For)) {
             return for_statement();
         }
@@ -372,7 +424,14 @@ private:
         return stmts;
     }
 
-    auto expression() -> ExprPtr { return assignment(); }
+    auto expression() -> ExprPtr
+    {
+        auto prev_op_sloc = m_op_sloc;
+        m_op_sloc = peek().sloc;
+        AT_SCOPE_EXIT(m_op_sloc = prev_op_sloc);
+
+        return assignment();
+    }
 
     auto assignment() -> ExprPtr
     {
@@ -397,7 +456,7 @@ private:
                     },
             };
 
-            return std::visit(visitor, *expr);
+            return std::visit(visitor, expr->expr);
         }
 
         return expr;
@@ -541,6 +600,7 @@ private:
 
     std::span<const Token> m_tokens;
     std::size_t m_current = 0;
+    SourceLocation m_op_sloc = {.line = 1, .column = 1};
 };
 
 // TODO: should denote failure, replace with std::expected

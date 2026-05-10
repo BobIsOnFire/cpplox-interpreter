@@ -2,9 +2,12 @@ export module cpplox:Grammar;
 
 import std;
 
+import :SourceLocation;
 import :Token;
 
 namespace cpplox {
+
+// *** Forward Declarations ***
 
 namespace expr {
 {%- for elem in data.grammar.expressions %}
@@ -12,23 +15,19 @@ export struct {{ elem.type }};
 {%- endfor %}
 } // namespace expr
 
-export using Expr = std::variant<
-    expr::{{ data.grammar.expressions|map(attribute='type')|join(',\n    expr::') }}
->;
-
-export using ExprPtr = std::unique_ptr<Expr>;
-
 namespace stmt {
 {%- for elem in data.grammar.statements %}
 export struct {{ elem.type }};
 {%- endfor %}
 } // namespace stmt
 
-export using Stmt = std::variant<
-    stmt::{{ data.grammar.statements|map(attribute='type')|join(',\n    stmt::') }}
->;
+export struct Expr;
+export struct Stmt;
 
+export using ExprPtr = std::unique_ptr<Expr>;
 export using StmtPtr = std::unique_ptr<Stmt>;
+
+// *** Struct Definitions
 
 namespace expr {
 {%- for elem in data.grammar.expressions %}
@@ -44,11 +43,20 @@ export struct {{ elem.type }} {
 {%- endfor %}
 } // namespace expr
 
-template <class ExprT, class... Args>
-auto make_unique_expr(Args &&... args) -> ExprPtr
-{
-    return std::make_unique<Expr>(std::in_place_type<ExprT>, std::forward<Args>(args)...);
-}
+export using ExprType = std::variant<
+    expr::{{ data.grammar.expressions|map(attribute='type')|join(',\n    expr::') }}
+>;
+
+export struct Expr {
+    ExprType expr;
+    SourceLocation sloc;
+
+    template <class ExprT, class... Args>
+    explicit Expr(SourceLocation sloc_, std::in_place_type_t<ExprT> /* ty */, Args &&... args)
+        : expr(std::in_place_type<ExprT>, std::forward<Args>(args)...)
+        , sloc(sloc_)
+    {}
+};
 
 namespace stmt {
 {%- for elem in data.grammar.statements %}
@@ -64,10 +72,19 @@ export struct {{ elem.type }} {
 {%- endfor %}
 } // namespace stmt
 
-template <class StmtT, class... Args>
-auto make_unique_stmt(Args &&... args) -> StmtPtr
-{
-    return std::make_unique<Stmt>(std::in_place_type<StmtT>, std::forward<Args>(args)...);
-}
+export using StmtType = std::variant<
+    stmt::{{ data.grammar.statements|map(attribute='type')|join(',\n    stmt::') }}
+>;
+
+export struct Stmt {
+    StmtType stmt;
+    SourceLocation sloc;
+
+    template <class StmtT, class... Args>
+    explicit Stmt(SourceLocation sloc_, std::in_place_type_t<StmtT> /* ty */, Args &&... args)
+        : stmt(std::in_place_type<StmtT>, std::forward<Args>(args)...)
+        , sloc(sloc_)
+    {}
+};
 
 } // namespace cpplox

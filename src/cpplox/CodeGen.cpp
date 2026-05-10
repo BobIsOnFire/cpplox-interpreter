@@ -83,8 +83,21 @@ public:
     auto operator()(auto && x) -> void { visit(x); }
 
 private:
-    auto visit(const StmtPtr & stmt) -> void { std::visit(*this, *stmt); }
-    auto visit(const ExprPtr & expr) -> void { std::visit(*this, *expr); }
+    auto visit(const StmtPtr & stmt) -> void
+    {
+        auto prev_op_sloc = m_op_sloc;
+        m_op_sloc = stmt->sloc;
+        std::visit(*this, stmt->stmt);
+        m_op_sloc = prev_op_sloc;
+    }
+
+    auto visit(const ExprPtr & expr) -> void
+    {
+        auto prev_op_sloc = m_op_sloc;
+        m_op_sloc = expr->sloc;
+        std::visit(*this, expr->expr);
+        m_op_sloc = prev_op_sloc;
+    }
 
     auto visit(const stmt::Block & stmt) -> void
     {
