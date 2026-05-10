@@ -61,6 +61,14 @@ private:
         bool has_superclass = false;
     };
 
+    struct VariableInfo
+    {
+        OpCode get_op;
+        OpCode set_op;
+        Byte op_arg;
+        bool is_const;
+    };
+
 public:
     explicit CodeGen(std::span<const StmtPtr> stmts)
         : m_stmts(stmts)
@@ -123,7 +131,7 @@ private:
 
         if (stmt.super.has_value()) {
             const auto & super = stmt.super.value();
-            emit_variable_op(super.name, /* is_set = */ false);
+            emit_variable_read(super.name);
 
             if (stmt.name.lexeme == super.name.lexeme) {
                 error_at(super.name, "A class cannot inherit from itself.");
@@ -133,11 +141,11 @@ private:
             add_local(synthetic_token(super.name.sloc, "super"), /* is_const = */ true);
             define_variable(0, /* is_const = */ true);
 
-            emit_variable_op(stmt.name, /* is_set = */ false);
+            emit_variable_read(stmt.name);
             emit_byte(OpCode::Inherit);
         }
 
-        emit_variable_op(stmt.name, /* is_set = */ false);
+        emit_variable_read(stmt.name);
 
         for (const auto & method : stmt.methods) {
             Byte constant = identifier_constant(method.name);
@@ -258,7 +266,12 @@ private:
     auto visit(const expr::Assign & expr) -> void
     {
         visit(expr.value);
-        emit_variable_op(expr.name, /* is_set = */ true);
+
+        auto var = resolve_variable(expr.name);
+        if (var.is_const) {
+            error_at(expr.op, "Cannot assign to const variable.");
+        }
+        emit_bytes(var.set_op, var.op_arg);
     }
 
     auto visit(const expr::Binary & expr) -> void
@@ -374,8 +387,8 @@ private:
 
         // TODO: Faster super calls, ch. 29.3.2
         Byte name = identifier_constant(expr.method);
-        emit_variable_op(synthetic_token(expr.keyword.sloc, "this"), /* is_set = */ false);
-        emit_variable_op(synthetic_token(expr.keyword.sloc, "super"), /* is_set = */ false);
+        emit_variable_read(synthetic_token(expr.keyword.sloc, "this"));
+        emit_variable_read(synthetic_token(expr.keyword.sloc, "super"));
         emit_bytes(OpCode::GetSuper, name);
     }
 
@@ -385,7 +398,7 @@ private:
             error_at(expr.keyword, "Cannot use 'this' outside of a class.");
         }
 
-        emit_variable_op(expr.keyword, /* is_set = */ false);
+        emit_variable_read(expr.keyword);
     }
 
     auto visit(const expr::Unary & expr) -> void
@@ -399,10 +412,7 @@ private:
         }
     }
 
-    auto visit(const expr::Variable & expr) -> void
-    {
-        emit_variable_op(expr.name, /* is_set = */ false);
-    }
+    auto visit(const expr::Variable & expr) -> void { emit_variable_read(expr.name); }
 
     // *** Helpers ***
 
@@ -785,44 +795,41 @@ private:
         emit_bytes(is_const ? OpCode::DefineGlobalConst : OpCode::DefineGlobalVar, global);
     }
 
-    auto emit_variable_op(const Token & name, bool is_set) -> void
+    auto resolve_variable(const Token & name) -> VariableInfo
     {
-        OpCode get_op = OpCode::GetGlobal;
-        OpCode set_op = OpCode::SetGlobal;
-        Byte arg = 0;
-        bool is_const = false;
-
         if (auto local_pos = resolve_local(name); local_pos.has_value()) {
             auto & [pos, local] = local_pos.value();
-            get_op = OpCode::GetLocal;
-            set_op = OpCode::SetLocal;
-            arg = static_cast<Byte>(pos);
-            is_const = local.is_const;
-        }
-        else if (auto upvalue_pos = resolve_upvalue(name); upvalue_pos.has_value()) {
-            auto & [pos, upvalue] = upvalue_pos.value();
-            get_op = OpCode::GetUpvalue;
-            set_op = OpCode::SetUpvalue;
-            arg = static_cast<Byte>(pos);
-            is_const = upvalue.is_const;
-        }
-        else {
-            get_op = OpCode::GetGlobal;
-            set_op = OpCode::SetGlobal;
-            arg = identifier_constant(name);
-            // Global const assignment is checked at runtime
-            is_const = false;
+            return {
+                    .get_op = OpCode::GetLocal,
+                    .set_op = OpCode::SetLocal,
+                    .op_arg = Byte(pos),
+                    .is_const = local.is_const,
+            };
         }
 
-        if (is_set) {
-            if (is_const) {
-                error_at(name, "Cannot assign to const variable.");
-            }
-            emit_bytes(set_op, arg);
+        if (auto upvalue_pos = resolve_upvalue(name); upvalue_pos.has_value()) {
+            auto & [pos, upvalue] = upvalue_pos.value();
+            return {
+                    .get_op = OpCode::GetUpvalue,
+                    .set_op = OpCode::SetUpvalue,
+                    .op_arg = Byte(pos),
+                    .is_const = upvalue.is_const,
+            };
         }
-        else {
-            emit_bytes(get_op, arg);
-        }
+
+        return {
+                .get_op = OpCode::GetGlobal,
+                .set_op = OpCode::SetGlobal,
+                .op_arg = identifier_constant(name),
+                // Global const assignment is checked at runtime
+                .is_const = false,
+        };
+    }
+
+    auto emit_variable_read(const Token & name) -> void
+    {
+        auto var = resolve_variable(name);
+        emit_bytes(var.get_op, var.op_arg);
     }
 
 private:

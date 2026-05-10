@@ -69,19 +69,30 @@ public:
     {
     }
 
-    auto parse() -> std::vector<StmtPtr>
+    auto parse() -> std::optional<std::vector<StmtPtr>>
     {
         std::vector<StmtPtr> stmts;
+        bool has_errors = false;
         while (!is_at_end()) {
             auto decl = declaration();
             if (decl.has_value()) {
                 stmts.push_back(std::move(decl).value());
             }
+            else {
+                has_errors = true;
+            }
         }
-        return stmts;
+        return has_errors ? std::nullopt : std::optional{std::move(stmts)};
     }
 
 private:
+// It's not possible to use a constexpr function here
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define SLOC_BARRIER(value)                                                                        \
+    auto prev_op_sloc = m_op_sloc;                                                                 \
+    m_op_sloc = (value);                                                                           \
+    AT_SCOPE_EXIT(m_op_sloc = prev_op_sloc);
+
     [[nodiscard]] auto is_at_end() const -> bool { return peek().type == TokenType::EndOfFile; }
 
     [[nodiscard]] auto peek() const -> const Token & { return m_tokens[m_current]; }
@@ -100,6 +111,10 @@ private:
     {
         if (is_at_end()) {
             return false;
+        }
+
+        if (peek().type == TokenType::Error) {
+            throw error(peek(), peek().lexeme);
         }
 
         return peek().type == type;
@@ -124,7 +139,7 @@ private:
         throw error(peek(), error_message);
     }
 
-    auto error(const Token & token, std::string_view message) -> ParserError
+    auto error(const Token & token, std::string_view message) const -> ParserError
     {
         std::print(std::cerr, "[{}:{}] Error", token.sloc.line, token.sloc.column);
 
@@ -143,6 +158,9 @@ private:
     auto synchronize() -> void
     {
         advance();
+        if (peek().type == TokenType::Error) {
+            error(peek(), peek().lexeme);
+        }
 
         while (!is_at_end()) {
             if (previous().type == Semicolon) {
@@ -162,6 +180,9 @@ private:
             }
 
             advance();
+            if (peek().type == TokenType::Error) {
+                error(peek(), peek().lexeme);
+            }
         }
     }
 
@@ -201,8 +222,10 @@ private:
         if (!check(RightParenthesis)) {
             do {
                 if (params.size() >= MAX_ARGS_COUNT) {
-                    error(peek(),
-                          std::format("Can't have more than {} call arguments.", MAX_ARGS_COUNT));
+                    throw error(
+                            peek(),
+                            std::format("Cannot have more than {} parameters.", MAX_ARGS_COUNT)
+                    );
                 }
                 params.emplace_back(consume(Identifier, "Expect parameter name."));
             } while (match(Comma));
@@ -224,9 +247,7 @@ private:
     {
         // FIXME: check clox error handling -- can do this without exceptions?
         try {
-            auto prev_op_sloc = m_op_sloc;
-            m_op_sloc = peek().sloc;
-            AT_SCOPE_EXIT(m_op_sloc = prev_op_sloc);
+            SLOC_BARRIER(peek().sloc);
 
             if (match(Class)) {
                 return class_declaration();
@@ -286,9 +307,7 @@ private:
 
     auto statement() -> StmtPtr
     {
-        auto prev_op_sloc = m_op_sloc;
-        m_op_sloc = peek().sloc;
-        AT_SCOPE_EXIT(m_op_sloc = prev_op_sloc);
+        SLOC_BARRIER(peek().sloc);
 
         if (match(For)) {
             return for_statement();
@@ -429,10 +448,7 @@ private:
 
     auto expression() -> ExprPtr
     {
-        auto prev_op_sloc = m_op_sloc;
-        m_op_sloc = peek().sloc;
-        AT_SCOPE_EXIT(m_op_sloc = prev_op_sloc);
-
+        SLOC_BARRIER(peek().sloc);
         return assignment();
     }
 
@@ -444,9 +460,11 @@ private:
             const auto & equals = previous();
             auto value = assignment();
 
+            SLOC_BARRIER(expr->sloc);
+
             const auto visitor = overloads{
                     [&](expr::Variable & e) {
-                        return make_unique_expr<expr::Assign>(e.name, std::move(value));
+                        return make_unique_expr<expr::Assign>(e.name, equals, std::move(value));
                     },
                     [&](expr::Get & e) {
                         return make_unique_expr<expr::Set>(
@@ -454,7 +472,7 @@ private:
                         );
                     },
                     [&](auto &) {
-                        error(equals, "Invalid assignment target.");
+                        throw error(equals, "Invalid assignment target.");
                         return std::move(expr);
                     },
             };
@@ -531,12 +549,14 @@ private:
     auto call() -> ExprPtr
     {
         auto expr = primary();
+        SLOC_BARRIER(expr->sloc);
         while (true) {
             if (match(LeftParenthesis)) {
                 expr = finish_call(std::move(expr));
             }
             else if (match(Dot)) {
                 const auto & name = consume(Identifier, "Expect property name after '.'.");
+                m_op_sloc = name.sloc;
                 expr = make_unique_expr<expr::Get>(std::move(expr), name);
             }
             else {
@@ -554,8 +574,10 @@ private:
             args.push_back(expression());
             while (match(Comma)) {
                 if (args.size() >= MAX_ARGS_COUNT) {
-                    error(peek(),
-                          std::format("Can't have more than {} call arguments.", MAX_ARGS_COUNT));
+                    throw error(
+                            peek(),
+                            std::format("Cannot have more than {} arguments.", MAX_ARGS_COUNT)
+                    );
                 }
                 args.push_back(expression());
             }
@@ -577,6 +599,9 @@ private:
         if (match(Super)) {
             const auto & keyword = previous();
             consume(Dot, "Expect '.' after 'super'.");
+
+            SLOC_BARRIER(peek().sloc);
+
             return make_unique_expr<expr::Super>(
                     keyword, consume(Identifier, "Expect superclass method name.")
             );

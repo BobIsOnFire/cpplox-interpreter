@@ -5,6 +5,7 @@ grammar:
   - type: Assign
     params:
     - { name: name, type: cpplox::Token }
+    - { name: op, type: cpplox::Token }
     - { name: value }
 
   - type: Binary
