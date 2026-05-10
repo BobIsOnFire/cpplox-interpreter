@@ -250,10 +250,13 @@ private:
     {
         const auto & name = consume(Identifier, "Expect class name.");
 
-        auto super = match(Less) ? std::optional(expr::Variable{
-                                           .name = consume(Identifier, "Expect superclass name."),
-                                   })
-                                 : std::nullopt;
+        auto super = match(Less)
+                ? std::optional(
+                          expr::Variable{
+                                  .name = consume(Identifier, "Expect superclass name."),
+                          }
+                  )
+                : std::nullopt;
 
         consume(LeftBrace, "Expect '{' before class body.");
 

@@ -892,10 +892,12 @@ private:
         FunctionCompiler compiler = end_function();
         emit_bytes(
                 OpCode::Closure,
-                make_constant(FunctionReference{
-                        .name = std::string{compiler.code.get_name()},
-                        .sloc = compiler.code.get_location(),
-                })
+                make_constant(
+                        FunctionReference{
+                                .name = std::string{compiler.code.get_name()},
+                                .sloc = compiler.code.get_location(),
+                        }
+                )
         );
 
         for (const auto & upvalue : compiler.upvalues) {

@@ -539,10 +539,12 @@ private:
         }
 
         FunctionCompiler compiler = end_function();
-        auto result = make_constant(FunctionReference{
-                .name = std::string{compiler.code.get_name()},
-                .sloc = compiler.code.get_location(),
-        });
+        auto result = make_constant(
+                FunctionReference{
+                        .name = std::string{compiler.code.get_name()},
+                        .sloc = compiler.code.get_location(),
+                }
+        );
         if (!result.has_value()) {
             error_at(name, result.error());
         }
