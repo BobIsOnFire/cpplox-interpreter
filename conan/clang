@@ -1,7 +1,7 @@
 include(base)
 
 {# set compiler_exe = "clang" #}
-{% set compiler_exe = "/home/nikitoss/llvm-21.1.3/bin/clang" %}
+{% set compiler_exe = "/usr/bin/clang" %}
 
 {% set compiler, version, compiler_exe = detect_api.detect_clang_compiler(compiler_exe) %}
 
