@@ -506,8 +506,8 @@ private:
     auto expr_or() -> ExprPtr
     {
         auto expr = expr_and();
-        while (match(Or)) {
-            expr = make_unique_expr<expr::Logical>(std::move(expr), previous(), expr_and());
+        if (match(Or)) {
+            return make_unique_expr<expr::Logical>(std::move(expr), previous(), expr_or());
         }
         return expr;
     }
@@ -515,8 +515,8 @@ private:
     auto expr_and() -> ExprPtr
     {
         auto expr = equality();
-        while (match(And)) {
-            expr = make_unique_expr<expr::Logical>(std::move(expr), previous(), equality());
+        if (match(And)) {
+            return make_unique_expr<expr::Logical>(std::move(expr), previous(), expr_and());
         }
         return expr;
     }

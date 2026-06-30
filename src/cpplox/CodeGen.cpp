@@ -335,12 +335,11 @@ private:
 
     auto visit(const expr::Assign & expr) -> void
     {
-        visit(expr.value);
-
         auto var = resolve_variable(expr.name);
         if (var.is_const) {
             error_at(expr.op, "Cannot assign to const variable.");
         }
+        visit(expr.value);
         emit_bytes(var.set_op, var.op_arg);
     }
 
