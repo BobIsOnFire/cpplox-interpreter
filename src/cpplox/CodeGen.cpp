@@ -169,6 +169,57 @@ private:
         emit_byte(OpCode::Pop);
     }
 
+    auto visit(const stmt::For & stmt) -> void
+    {
+        if (stmt.initializer.has_value()) {
+            begin_scope();
+            visit(stmt.initializer.value());
+        }
+
+        current_function().loops.push_back(
+                {.loop_start = current_code().code().size(), .loop_breaks = {}}
+        );
+
+        if (stmt.increment.has_value()) {
+            // Jump over increment on first iteration
+            std::size_t jump_over_inc = emit_jump(OpCode::Jump);
+            // Loop start jump point -- will ensure that 'jump over increment' instruction is not
+            // executed on following iterations
+            //
+            // TODO: put increment block after the body, then jump straight to condition from it --
+            // this is what actual compilers do. Less patched jumps is better!
+            // 'continue' should always jump to the increment, so ensure it can do both forward
+            // jumps via emit_jump/patch_jump (to jump to 'for' increment) and backward jumps via
+            // emit_loop (to jump to 'while' condition or 'for' condition if there's no 'for'
+            // increment)
+            current_loop().loop_start = current_code().code().size();
+
+            visit(stmt.increment.value());
+            emit_byte(OpCode::Pop);
+
+            patch_jump(jump_over_inc);
+        }
+
+        if (stmt.condition.has_value()) {
+            visit(stmt.condition.value());
+            current_loop().loop_breaks.push_back(emit_jump(OpCode::JumpIfFalseAndPop));
+        }
+
+        visit(stmt.body);
+
+        emit_loop(current_loop().loop_start);
+
+        for (const auto loop_break : current_loop().loop_breaks) {
+            patch_jump(loop_break);
+        }
+
+        current_function().loops.pop_back();
+
+        if (stmt.initializer.has_value()) {
+            end_scope();
+        }
+    }
+
     auto visit(const stmt::Function & stmt) -> void
     {
         Byte global = parse_variable(stmt.name, /* is_const = */ true);
