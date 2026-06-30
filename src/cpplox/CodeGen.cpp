@@ -383,7 +383,6 @@ private:
     auto visit(const expr::Get & expr) -> void
     {
         visit(expr.object);
-        // TODO: Optimized invocations, ch. 28.5
         emit_bytes(OpCode::GetProperty, identifier_constant(expr.name));
     }
 
@@ -392,6 +391,16 @@ private:
     auto visit(const expr::Invalid & /* expr */) -> void
     {
         assert(false && "Never supposed to codegen on Invalid AST node, check error handling");
+    }
+
+    auto visit(const expr::Invoke & expr) -> void
+    {
+        visit(expr.object);
+        Byte method_name = identifier_constant(expr.method);
+        for (const auto & arg : expr.args) {
+            visit(arg);
+        }
+        emit_bytes(OpCode::Invoke, method_name, Byte(expr.args.size()));
     }
 
     auto visit(const expr::Literal & expr) -> void
@@ -452,24 +461,28 @@ private:
     auto visit(const expr::Set & expr) -> void
     {
         visit(expr.object);
+        Byte name = identifier_constant(expr.name);
         visit(expr.value);
-        emit_bytes(OpCode::SetProperty, identifier_constant(expr.name));
+        emit_bytes(OpCode::SetProperty, name);
     }
 
     auto visit(const expr::Super & expr) -> void
     {
-        if (m_class_compilers.empty()) {
-            error_at(expr.keyword, "Cannot use 'super' outside of a class.");
-        }
-        else if (!current_class().has_superclass) {
-            error_at(expr.keyword, "Cannot use 'super' in a class with no superclass.");
-        }
-
-        // TODO: Faster super calls, ch. 29.3.2
-        Byte name = identifier_constant(expr.method);
+        Byte name = super_method_constant(expr.keyword, expr.method);
         emit_variable_read(synthetic_token(expr.keyword.sloc, "this"));
         emit_variable_read(synthetic_token(expr.keyword.sloc, "super"));
         emit_bytes(OpCode::GetSuper, name);
+    }
+
+    auto visit(const expr::SuperInvoke & expr) -> void
+    {
+        Byte method_name = super_method_constant(expr.keyword, expr.method);
+        emit_variable_read(synthetic_token(expr.keyword.sloc, "this"));
+        for (const auto & arg : expr.args) {
+            visit(arg);
+        }
+        emit_variable_read(synthetic_token(expr.keyword.sloc, "super"));
+        emit_bytes(OpCode::SuperInvoke, method_name, Byte(expr.args.size()));
     }
 
     auto visit(const expr::This & expr) -> void
@@ -909,6 +922,20 @@ private:
     {
         auto var = resolve_variable(name);
         emit_bytes(var.get_op, var.op_arg);
+    }
+
+    // These two parameters always come together, and names are fairly descriptive
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    auto super_method_constant(const Token & super_keyword, const Token & method_name) -> Byte
+    {
+        if (m_class_compilers.empty()) {
+            error_at(super_keyword, "Cannot use 'super' outside of a class.");
+        }
+        else if (!current_class().has_superclass) {
+            error_at(super_keyword, "Cannot use 'super' in a class with no superclass.");
+        }
+
+        return identifier_constant(method_name);
     }
 
 private:

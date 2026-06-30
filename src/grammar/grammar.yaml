@@ -17,7 +17,6 @@ grammar:
   - type: Call
     params:
     - { name: callee }
-    - { name: paren, type: cpplox::Token }
     - { name: args, type: std::vector<cpplox::ExprPtr> }
 
   - type: Function
@@ -37,6 +36,12 @@ grammar:
 
   - type: Invalid
     params: []
+
+  - type: Invoke
+    params:
+    - { name: object }
+    - { name: method, type: cpplox::Token }
+    - { name: args, type: std::vector<cpplox::ExprPtr> }
 
   - type: Literal
     params:
@@ -58,6 +63,12 @@ grammar:
     params:
     - { name: keyword, type: cpplox::Token }
     - { name: method, type: cpplox::Token }
+
+  - type: SuperInvoke
+    params:
+    - { name: keyword, type: cpplox::Token }
+    - { name: method, type: cpplox::Token }
+    - { name: args, type: std::vector<cpplox::ExprPtr> }
 
   - type: This
     params:

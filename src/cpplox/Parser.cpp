@@ -224,6 +224,25 @@ private:
         return params;
     }
 
+    auto get_call_arguments() -> std::vector<ExprPtr>
+    {
+        std::vector<ExprPtr> args;
+        if (!check(RightParenthesis)) {
+            args.push_back(expression());
+            while (match(Comma)) {
+                if (args.size() >= MAX_ARGS_COUNT) {
+                    error(peek(),
+                          std::format("Cannot have more than {} arguments.", MAX_ARGS_COUNT));
+                }
+                args.push_back(expression());
+            }
+        }
+
+        consume(RightParenthesis, "Expect ')' after call arguments.");
+
+        return args;
+    }
+
     // NOLINTNEXTLINE(misc-no-recursion)
     auto function_node(std::string_view kind) -> stmt::Function
     {
@@ -570,12 +589,19 @@ private:
         SLOC_BARRIER(expr->sloc);
         while (true) {
             if (match(LeftParenthesis)) {
-                expr = finish_call(std::move(expr));
+                expr = make_unique_expr<expr::Call>(std::move(expr), get_call_arguments());
             }
             else if (match(Dot)) {
                 const auto & name = consume(Identifier, "Expect property name after '.'.");
                 m_op_sloc = name.sloc;
-                expr = make_unique_expr<expr::Get>(std::move(expr), name);
+                if (match(LeftParenthesis)) {
+                    expr = make_unique_expr<expr::Invoke>(
+                            std::move(expr), name, get_call_arguments()
+                    );
+                }
+                else {
+                    expr = make_unique_expr<expr::Get>(std::move(expr), name);
+                }
             }
             else {
                 break;
@@ -583,27 +609,6 @@ private:
         }
 
         return expr;
-    }
-
-    auto finish_call(ExprPtr callee) -> ExprPtr
-    {
-        std::vector<ExprPtr> args;
-        if (!check(RightParenthesis)) {
-            args.push_back(expression());
-            while (match(Comma)) {
-                if (args.size() >= MAX_ARGS_COUNT) {
-                    error(peek(),
-                          std::format("Cannot have more than {} arguments.", MAX_ARGS_COUNT));
-                }
-                args.push_back(expression());
-            }
-        }
-
-        return make_unique_expr<expr::Call>(
-                std::move(callee),
-                consume(RightParenthesis, "Expect ')' after call arguments."),
-                std::move(args)
-        );
     }
 
     auto primary() -> ExprPtr
@@ -618,9 +623,13 @@ private:
 
             SLOC_BARRIER(peek().sloc);
 
-            return make_unique_expr<expr::Super>(
-                    keyword, consume(Identifier, "Expect superclass method name.")
-            );
+            auto method_name = consume(Identifier, "Expect superclass method name.");
+            if (match(LeftParenthesis)) {
+                return make_unique_expr<expr::SuperInvoke>(
+                        keyword, method_name, get_call_arguments()
+                );
+            }
+            return make_unique_expr<expr::Super>(keyword, method_name);
         }
 
         if (match(This)) {
