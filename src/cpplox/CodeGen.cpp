@@ -116,6 +116,15 @@ private:
         end_scope();
     }
 
+    auto visit(const stmt::Break & stmt) -> void
+    {
+        if (current_function().loops.empty()) {
+            error_at(stmt.self, "Cannot use 'break' outside of a loop.");
+            return;
+        }
+        current_loop().loop_breaks.push_back(emit_jump(OpCode::Jump));
+    }
+
     auto visit(const stmt::Class & stmt) -> void
     {
         Byte name_constant = identifier_constant(stmt.name);
@@ -161,6 +170,15 @@ private:
         if (current_class().has_superclass) {
             end_scope();
         }
+    }
+
+    auto visit(const stmt::Continue & stmt) -> void
+    {
+        if (current_function().loops.empty()) {
+            error_at(stmt.self, "Cannot use 'continue' outside of a loop.");
+            return;
+        }
+        emit_loop(current_loop().loop_start);
     }
 
     auto visit(const stmt::Expression & stmt) -> void

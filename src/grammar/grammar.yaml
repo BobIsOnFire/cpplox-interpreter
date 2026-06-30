@@ -78,11 +78,19 @@ grammar:
     params:
     - { name: stmts, type: std::vector<cpplox::StmtPtr> }
 
+  - type: Break
+    params:
+    - { name: self, type: cpplox::Token }
+
   - type: Class
     params:
     - { name: name, type: cpplox::Token }
     - { name: super, type: std::optional<cpplox::expr::Variable> }
     - { name: methods, type: std::vector<cpplox::stmt::Function> }
+
+  - type: Continue
+    params:
+    - { name: self, type: cpplox::Token }
 
   - type: Expression
     params:

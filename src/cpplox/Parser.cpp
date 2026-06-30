@@ -309,6 +309,12 @@ private:
     {
         SLOC_BARRIER(peek().sloc);
 
+        if (match(Break)) {
+            return break_statement();
+        }
+        if (match(Continue)) {
+            return continue_statement();
+        }
         if (match(For)) {
             return for_statement();
         }
@@ -329,6 +335,20 @@ private:
         }
 
         return expression_statement();
+    }
+
+    auto break_statement() -> StmtPtr
+    {
+        const auto & token = previous();
+        consume(Semicolon, "Expect ';' after 'break'.");
+        return make_unique_stmt<stmt::Break>(token);
+    }
+
+    auto continue_statement() -> StmtPtr
+    {
+        const auto & token = previous();
+        consume(Semicolon, "Expect ';' after 'continue'.");
+        return make_unique_stmt<stmt::Continue>(token);
     }
 
     auto for_statement() -> StmtPtr
