@@ -305,6 +305,11 @@ private:
         emit_bytes(OpCode::Call, Byte(expr.args.size()));
     }
 
+    auto visit(const expr::Function & expr) -> void
+    {
+        function(FunctionType::Anonymous, expr.keyword, expr.params, expr.stmts);
+    }
+
     auto visit(const expr::Get & expr) -> void
     {
         visit(expr.object);
@@ -575,9 +580,9 @@ private:
     auto make_function(const Token & function, FunctionType type) -> FunctionCompiler
     {
         auto get_name = [function, type, this] -> std::string {
-            // if (type == FunctionType::Anonymous) {
-            //     return "[anonymous]";
-            // }
+            if (type == FunctionType::Anonymous) {
+                return "[anonymous]";
+            }
             if (type == FunctionType::Function) {
                 return std::string{function.lexeme};
             }

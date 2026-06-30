@@ -205,12 +205,8 @@ private:
         });
     }
 
-    // NOLINTNEXTLINE(misc-no-recursion)
-    auto function_node(std::string_view kind) -> stmt::Function
+    auto get_function_parameters() -> std::vector<Token>
     {
-        const auto & name = consume(Identifier, std::format("Expect {} name.", kind));
-        consume(LeftParenthesis, std::format("Expect '(' after {} name.", kind));
-
         std::vector<Token> params;
         if (!check(RightParenthesis)) {
             do {
@@ -222,6 +218,17 @@ private:
             } while (match(Comma));
         }
         consume(RightParenthesis, "Expect ')' after parameters.");
+
+        return params;
+    }
+
+    // NOLINTNEXTLINE(misc-no-recursion)
+    auto function_node(std::string_view kind) -> stmt::Function
+    {
+        const auto & name = consume(Identifier, std::format("Expect {} name.", kind));
+        consume(LeftParenthesis, std::format("Expect '(' after {} name.", kind));
+
+        auto params = get_function_parameters();
 
         consume(LeftBrace, std::format("Expect '{{' before {} body.", kind));
         return stmt::Function{
@@ -534,6 +541,23 @@ private:
     {
         if (match_any(Bang, Minus)) {
             return make_unique_expr<expr::Unary>(previous(), unary());
+        }
+
+        return function_expression();
+    }
+
+    auto function_expression() -> ExprPtr
+    {
+        if (match(Fun)) {
+            const auto & keyword = previous();
+            consume(LeftParenthesis, "Expect '(' after 'fun'.");
+
+            auto params = get_function_parameters();
+
+            consume(LeftBrace, "Expect '{' before function body.");
+            return make_unique_expr<expr::Function>(
+                    keyword, std::move(params), get_block_statements()
+            );
         }
 
         return call();
