@@ -43,7 +43,7 @@ private:
 
 // It's not possible to use a constexpr function here
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#define AT_SCOPE_EXIT(body) ScopeExit se([&]() -> void { body; });
+#define AT_SCOPE_EXIT(body) ScopeExit([&]() -> void { body; });
 
 constexpr const std::size_t MAX_ARGS_COUNT = 255;
 
@@ -54,16 +54,6 @@ namespace cpplox {
 class Parser
 {
 public:
-    class ParserError : public std::runtime_error
-    {
-    public:
-        explicit ParserError(std::string_view what = "")
-            : std::runtime_error(what.data())
-        {
-        }
-    };
-
-public:
     explicit Parser(std::span<const Token> tokens)
         : m_tokens(tokens)
     {
@@ -72,17 +62,14 @@ public:
     auto parse() -> std::optional<std::vector<StmtPtr>>
     {
         std::vector<StmtPtr> stmts;
-        bool has_errors = false;
         while (!is_at_end()) {
             auto decl = declaration();
             if (decl.has_value()) {
                 stmts.push_back(std::move(decl).value());
             }
-            else {
-                has_errors = true;
-            }
         }
-        return has_errors ? std::nullopt : std::optional{std::move(stmts)};
+        // TODO: might be useful to return parsed tree even if it's invalid
+        return m_had_errors ? std::nullopt : std::optional{std::move(stmts)};
     }
 
 private:
@@ -91,7 +78,7 @@ private:
 #define SLOC_BARRIER(value)                                                                        \
     auto prev_op_sloc = m_op_sloc;                                                                 \
     m_op_sloc = (value);                                                                           \
-    AT_SCOPE_EXIT(m_op_sloc = prev_op_sloc);
+    auto sloc_exit = AT_SCOPE_EXIT(m_op_sloc = prev_op_sloc);
 
     [[nodiscard]] auto is_at_end() const -> bool { return peek().type == TokenType::EndOfFile; }
 
@@ -99,22 +86,23 @@ private:
 
     [[nodiscard]] auto previous() const -> const Token & { return m_tokens[m_current - 1]; }
 
-    auto advance() -> const Token &
+    [[nodiscard]] auto is_panic_mode() const -> bool { return m_panic_mode; }
+
+    auto advance() -> void
     {
         if (!is_at_end()) {
             m_current++;
         }
-        return previous();
     }
 
-    [[nodiscard]] auto check(TokenType type) const -> bool
+    [[nodiscard]] auto check(TokenType type) -> bool
     {
         if (is_at_end()) {
             return false;
         }
 
         if (peek().type == TokenType::Error) {
-            throw error(peek(), peek().lexeme);
+            error(peek(), peek().lexeme);
         }
 
         return peek().type == type;
@@ -134,13 +122,21 @@ private:
     auto consume(TokenType type, std::string_view error_message) -> const Token &
     {
         if (check(type)) {
-            return advance();
+            advance();
         }
-        throw error(peek(), error_message);
+        else {
+            error(peek(), error_message);
+        }
+        return previous();
     }
 
-    auto error(const Token & token, std::string_view message) const -> ParserError
+    auto error(const Token & token, std::string_view message) -> void
     {
+        if (m_panic_mode) {
+            return;
+        }
+        m_panic_mode = true;
+
         std::print(std::cerr, "[{}:{}] Error", token.sloc.line, token.sloc.column);
 
         if (token.type == TokenType::EndOfFile) {
@@ -152,15 +148,12 @@ private:
 
         std::println(std::cerr, ": {}", message);
 
-        return ParserError(message);
+        m_had_errors = true;
     }
 
     auto synchronize() -> void
     {
-        advance();
-        if (peek().type == TokenType::Error) {
-            error(peek(), peek().lexeme);
-        }
+        m_panic_mode = false;
 
         while (!is_at_end()) {
             if (previous().type == Semicolon) {
@@ -222,10 +215,8 @@ private:
         if (!check(RightParenthesis)) {
             do {
                 if (params.size() >= MAX_ARGS_COUNT) {
-                    throw error(
-                            peek(),
-                            std::format("Cannot have more than {} parameters.", MAX_ARGS_COUNT)
-                    );
+                    error(peek(),
+                          std::format("Cannot have more than {} parameters.", MAX_ARGS_COUNT));
                 }
                 params.emplace_back(consume(Identifier, "Expect parameter name."));
             } while (match(Comma));
@@ -245,8 +236,7 @@ private:
 
     auto declaration() noexcept -> std::optional<StmtPtr>
     {
-        // FIXME: check clox error handling -- can do this without exceptions?
-        try {
+        auto decl = [&]() -> StmtPtr {
             SLOC_BARRIER(peek().sloc);
 
             if (match(Class)) {
@@ -260,11 +250,14 @@ private:
             }
 
             return statement();
-        }
-        catch (const ParserError & error) {
+        }();
+
+        if (is_panic_mode()) {
             synchronize();
             return std::nullopt;
         }
+
+        return decl;
     }
 
     auto class_declaration() -> StmtPtr
@@ -472,7 +465,7 @@ private:
                         );
                     },
                     [&](auto &) {
-                        throw error(equals, "Invalid assignment target.");
+                        error(equals, "Invalid assignment target.");
                         return std::move(expr);
                     },
             };
@@ -574,10 +567,8 @@ private:
             args.push_back(expression());
             while (match(Comma)) {
                 if (args.size() >= MAX_ARGS_COUNT) {
-                    throw error(
-                            peek(),
-                            std::format("Cannot have more than {} arguments.", MAX_ARGS_COUNT)
-                    );
+                    error(peek(),
+                          std::format("Cannot have more than {} arguments.", MAX_ARGS_COUNT));
                 }
                 args.push_back(expression());
             }
@@ -621,7 +612,9 @@ private:
             return make_unique_expr<expr::Grouping>(std::move(expr));
         }
 
-        throw error(peek(), "Expect expression.");
+        error(peek(), "Expect expression.");
+        advance();
+        return make_unique_expr<expr::Invalid>();
     }
 
     // NOLINTEND(misc-no-recursion)
@@ -629,6 +622,8 @@ private:
     std::span<const Token> m_tokens;
     std::size_t m_current = 0;
     SourceLocation m_op_sloc = {.line = 1, .column = 1};
+    bool m_panic_mode = false;
+    bool m_had_errors = false;
 };
 
 // TODO: should denote failure, replace with std::expected

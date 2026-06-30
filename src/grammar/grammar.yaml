@@ -29,6 +29,9 @@ grammar:
     params:
     - { name: expr }
 
+  - type: Invalid
+    params: []
+
   - type: Literal
     params:
     - { name: value, type: cpplox::Token }

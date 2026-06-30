@@ -314,6 +314,11 @@ private:
 
     auto visit(const expr::Grouping & expr) -> void { visit(expr.expr); }
 
+    auto visit(const expr::Invalid & /* expr */) -> void
+    {
+        assert(false && "Never supposed to codegen on Invalid AST node, check error handling");
+    }
+
     auto visit(const expr::Literal & expr) -> void
     {
         switch (expr.value.type) {
