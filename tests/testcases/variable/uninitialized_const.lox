@@ -1,2 +1,2 @@
-const a; // Error at ';': Const variable must have an initializer.
+const a; // Error at 'a': Const variable must have an initializer.
 print a;

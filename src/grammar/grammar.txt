@@ -11,7 +11,7 @@ funDecl        → "fun" function ;
 function       → IDENTIFIER "(" parameters? ")" block ;
 parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
 
-varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+varDecl        → ("var" | "const") IDENTIFIER ( "=" expression )? ";" ;
 
 statement      → exprStmt
                | breakStmt

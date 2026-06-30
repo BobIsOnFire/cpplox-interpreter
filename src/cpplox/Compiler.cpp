@@ -804,18 +804,18 @@ private:
     {
         Byte global = parse_variable(is_const, "Expect variable name.");
 
-        bool has_initializer = m_parser.match(TokenType::Equal);
+        bool has_initializer = m_parser.check(TokenType::Equal);
         if (has_initializer) {
+            m_parser.advance();
             expression();
         }
         else {
+            if (is_const) {
+                m_parser.error("Const variable must have an initializer.");
+            }
             emit_byte(OpCode::Nil);
         }
         m_parser.consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
-
-        if (is_const && !has_initializer) {
-            m_parser.error("Const variable must have an initializer.");
-        }
 
         define_variable(global, is_const);
     }

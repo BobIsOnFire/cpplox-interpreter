@@ -1,1 +1,1 @@
-[1:8] Error at ';': Const variable must have an initializer.
+[1:7] Error at 'a': Const variable must have an initializer.

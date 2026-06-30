@@ -294,8 +294,7 @@ private:
 
     auto visit(const stmt::Var & stmt) -> void
     {
-        // TODO: support const keyword
-        bool is_const = false;
+        bool is_const = stmt.is_const;
 
         Byte global = parse_variable(stmt.name, is_const);
 
@@ -309,7 +308,7 @@ private:
             emit_byte(OpCode::Nil);
         }
 
-        define_variable(global, false);
+        define_variable(global, is_const);
     }
 
     auto visit(const stmt::While & stmt) -> void

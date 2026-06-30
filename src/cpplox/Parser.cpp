@@ -253,7 +253,10 @@ private:
                 return function("function");
             }
             if (match(Var)) {
-                return var_declaration();
+                return var_declaration(/* is_const = */ false);
+            }
+            if (match(Const)) {
+                return var_declaration(/* is_const = */ true);
             }
 
             return statement();
@@ -296,13 +299,13 @@ private:
         return make_unique_stmt<stmt::Function>(function_node(kind));
     }
 
-    auto var_declaration() -> StmtPtr
+    auto var_declaration(bool is_const) -> StmtPtr
     {
         const auto & name = consume(Identifier, "Expect variable name.");
 
         auto init = match(Equal) ? std::optional(expression()) : std::nullopt;
         consume(Semicolon, "Expect ';' after variable declaration.");
-        return make_unique_stmt<stmt::Var>(name, std::move(init));
+        return make_unique_stmt<stmt::Var>(name, std::move(init), is_const);
     }
 
     auto statement() -> StmtPtr
@@ -356,9 +359,19 @@ private:
         // TODO: a separate AST node for 'for' loop instead of desugaring
         consume(LeftParenthesis, "Expect '(' after 'for'.");
 
-        auto initializer = match(Semicolon)
-                ? std::nullopt
-                : std::optional(match(Var) ? var_declaration() : expression_statement());
+        std::optional<StmtPtr> initializer = std::nullopt;
+
+        if (!match(Semicolon)) {
+            if (match(Var)) {
+                initializer = var_declaration(/* is_const = */ false);
+            }
+            else if (match(Const)) {
+                initializer = var_declaration(/* is_const = */ true);
+            }
+            else {
+                initializer = expression_statement();
+            }
+        }
 
         auto condition = check(Semicolon) ? std::nullopt : std::optional(expression());
         consume(Semicolon, "Expect ';' after 'for' loop condition.");
