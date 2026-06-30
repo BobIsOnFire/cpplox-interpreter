@@ -23,7 +23,7 @@ grammar:
   - type: Function
     params:
     - { name: keyword, type: cpplox::Token }
-    - { name: params, type: std::vector<cpplox::Token> }
+    - { name: params, type: std::vector<cpplox::FunctionParameter> }
     - { name: stmts, type: std::vector<cpplox::StmtPtr> }
 
   - type: Get
@@ -106,7 +106,7 @@ grammar:
   - type: Function
     params:
     - { name: name, type: cpplox::Token }
-    - { name: params, type: std::vector<cpplox::Token> }
+    - { name: params, type: std::vector<cpplox::FunctionParameter> }
     - { name: stmts, type: std::vector<cpplox::StmtPtr> }
 
   - type: If

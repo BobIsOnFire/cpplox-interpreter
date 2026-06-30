@@ -9,7 +9,8 @@ classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )?
                  "{" function* "}" ;
 funDecl        → "fun" function ;
 function       → IDENTIFIER "(" parameters? ")" block ;
-parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
+parameters     → parameter ( "," parameter )* ;
+parameter      → "const"? IDENTIFIER ;
 
 varDecl        → ("var" | "const") IDENTIFIER ( "=" expression )? ";" ;
 

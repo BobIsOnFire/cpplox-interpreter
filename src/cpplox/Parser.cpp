@@ -2,6 +2,7 @@ module cpplox;
 
 import std;
 
+import :FunctionParameter;
 import :Grammar;
 import :Scanner;
 import :Token;
@@ -205,16 +206,17 @@ private:
         });
     }
 
-    auto get_function_parameters() -> std::vector<Token>
+    auto get_function_parameters() -> std::vector<FunctionParameter>
     {
-        std::vector<Token> params;
+        std::vector<FunctionParameter> params;
         if (!check(RightParenthesis)) {
             do {
                 if (params.size() >= MAX_ARGS_COUNT) {
                     error(peek(),
                           std::format("Cannot have more than {} parameters.", MAX_ARGS_COUNT));
                 }
-                params.emplace_back(consume(Identifier, "Expect parameter name."));
+                bool is_const = match(Const);
+                params.emplace_back(consume(Identifier, "Expect parameter name."), is_const);
             } while (match(Comma));
         }
         consume(RightParenthesis, "Expect ')' after parameters.");

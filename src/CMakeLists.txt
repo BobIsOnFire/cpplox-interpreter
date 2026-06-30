@@ -24,6 +24,7 @@ target_sources(
             cpplox/Compiler.cppm
             cpplox/Debug.cppm
             cpplox/EnumFormatter.cppm
+            cpplox/FunctionParameter.cppm
             cpplox/Obj.cppm
             cpplox/Object.cppm
             cpplox/ObjReferenceTracer.cppm

@@ -7,7 +7,9 @@ module cpplox;
 import std;
 
 import :CodeGen;
+import :FunctionParameter;
 import :Parser;
+import :Token;
 
 namespace cpplox {
 
@@ -608,7 +610,7 @@ private:
     auto function(
             FunctionType type,
             const Token & name,
-            std::span<const Token> params,
+            std::span<const FunctionParameter> params,
             std::span<const StmtPtr> body
     ) -> void
     {
@@ -617,9 +619,8 @@ private:
 
         current_function().code.arity() = params.size();
         for (const auto & param : params) {
-            bool is_const = false; // TODO: support const params
-            Byte constant = parse_variable(param, is_const);
-            define_variable(constant, is_const);
+            Byte constant = parse_variable(param.name, param.is_const);
+            define_variable(constant, param.is_const);
         }
 
         for (const auto & stmt : body) {
