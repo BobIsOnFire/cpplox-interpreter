@@ -24,6 +24,5 @@ foreach(file IN LISTS TEST_FILES)
             ENVIRONMENT
                 UBSAN_OPTIONS=print_stacktrace=1
                 LOX_DEBUG_RUN_GC_EVERY_TIME=1
-                LOX_USE_AST_CODEGEN=1
     )
 endforeach()
