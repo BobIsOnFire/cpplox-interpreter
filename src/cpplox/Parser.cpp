@@ -414,7 +414,6 @@ private:
 
     auto for_statement() -> StmtPtr
     {
-        // TODO: a separate AST node for 'for' loop instead of desugaring
         consume(LeftParenthesis, "Expect '(' after 'for'.");
 
         std::optional<StmtPtr> initializer = std::nullopt;
