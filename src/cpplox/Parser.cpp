@@ -1,3 +1,9 @@
+module;
+
+#include <boost/preprocessor.hpp>
+
+#include <cassert>
+
 module cpplox;
 
 import std;
@@ -54,6 +60,37 @@ namespace cpplox {
 
 class Parser
 {
+private:
+    enum class Precedence : std::uint8_t
+    {
+        None,
+        Assignment, // =
+        Or,         // or
+        And,        // and
+        Equality,   // == !=
+        Comparison, // < > <= >=
+        Term,       // + -
+        Factor,     // * /
+        Unary,      // ! -
+        Call,       // . ()
+        Primary,
+    };
+
+    struct ParseContext
+    {
+        bool can_assign;
+    };
+
+    using PrefixParseFn = auto (Parser::*)(ParseContext) -> ExprPtr;
+    using InfixParseFn = auto (Parser::*)(ExprPtr lhs, ParseContext) -> ExprPtr;
+
+    struct ParseRule
+    {
+        PrefixParseFn prefix = nullptr;
+        InfixParseFn infix = nullptr;
+        Precedence precedence = Precedence::None;
+    };
+
 public:
     explicit Parser(std::span<const Token> tokens)
         : m_tokens(tokens)
@@ -466,193 +503,201 @@ private:
         return stmts;
     }
 
-    auto expression() -> ExprPtr
+    auto expression() -> ExprPtr { return parse_precedence(Precedence::Assignment); }
+
+    auto logical(ExprPtr lhs, ParseContext /* ctx */) -> ExprPtr
+    {
+        Token op = previous();
+        auto precedence = get_rule(op.type).precedence;
+
+        return make_unique_expr<expr::Logical>(std::move(lhs), op, parse_precedence(precedence));
+    }
+
+    auto binary(ExprPtr lhs, ParseContext /* ctx */) -> ExprPtr
+    {
+        Token op = previous();
+        auto precedence = next_precedence(get_rule(op.type).precedence);
+
+        return make_unique_expr<expr::Binary>(std::move(lhs), op, parse_precedence(precedence));
+    }
+
+    auto unary(ParseContext /* ctx */) -> ExprPtr
+    {
+        return make_unique_expr<expr::Unary>(previous(), parse_precedence(Precedence::Unary));
+    }
+
+    auto fun_ex(ParseContext /* ctx */) -> ExprPtr
+    {
+        const auto & keyword = previous();
+        consume(LeftParenthesis, "Expect '(' after 'fun'.");
+
+        auto params = get_function_parameters();
+
+        consume(LeftBrace, "Expect '{' before function body.");
+        return make_unique_expr<expr::Function>(keyword, std::move(params), get_block_statements());
+    }
+
+    auto call(ExprPtr callee, ParseContext /* ctx */) -> ExprPtr
+    {
+        return make_unique_expr<expr::Call>(std::move(callee), get_call_arguments());
+    }
+
+    auto literal(ParseContext /* ctx */) -> ExprPtr
+    {
+        return make_unique_expr<expr::Literal>(previous());
+    }
+
+    auto super_ex(ParseContext /* ctx */) -> ExprPtr
+    {
+        const auto & keyword = previous();
+        consume(Dot, "Expect '.' after 'super'.");
+
+        SLOC_BARRIER(peek().sloc);
+
+        auto method_name = consume(Identifier, "Expect superclass method name.");
+        if (match(LeftParenthesis)) {
+            return make_unique_expr<expr::SuperInvoke>(keyword, method_name, get_call_arguments());
+        }
+        return make_unique_expr<expr::Super>(keyword, method_name);
+    }
+
+    auto this_ex(ParseContext /* ctx */) -> ExprPtr
+    {
+        return make_unique_expr<expr::This>(previous());
+    }
+
+    auto variable(ParseContext ctx) -> ExprPtr
+    {
+        auto name = previous();
+        if (ctx.can_assign && match(TokenType::Equal)) {
+            return make_unique_expr<expr::Assign>(name, previous(), expression());
+        }
+        return make_unique_expr<expr::Variable>(name);
+    }
+
+    auto grouping(ParseContext /* ctx */) -> ExprPtr
+    {
+        auto expr = expression();
+        consume(RightParenthesis, "Expect ')' after expression.");
+        return make_unique_expr<expr::Grouping>(std::move(expr));
+    }
+
+    auto dot(ExprPtr object, ParseContext ctx) -> ExprPtr
     {
         SLOC_BARRIER(peek().sloc);
-        return assignment();
+
+        auto name = consume(TokenType::Identifier, "Expect property name after '.'.");
+
+        if (ctx.can_assign && match(TokenType::Equal)) {
+            return make_unique_expr<expr::Set>(std::move(object), name, expression());
+        }
+
+        if (match(TokenType::LeftParenthesis)) {
+            return make_unique_expr<expr::Invoke>(std::move(object), name, get_call_arguments());
+        }
+
+        return make_unique_expr<expr::Get>(std::move(object), name);
     }
 
-    auto assignment() -> ExprPtr
+    auto parse_precedence(Precedence precedence) -> ExprPtr
     {
-        auto expr = expr_or();
+        SLOC_BARRIER(peek().sloc);
 
-        if (match(Equal)) {
-            const auto & equals = previous();
-            auto value = assignment();
-
-            SLOC_BARRIER(expr->sloc);
-
-            const auto visitor = overloads{
-                    [&](expr::Variable & e) {
-                        return make_unique_expr<expr::Assign>(e.name, equals, std::move(value));
-                    },
-                    [&](expr::Get & e) {
-                        return make_unique_expr<expr::Set>(
-                                std::move(e.object), e.name, std::move(value)
-                        );
-                    },
-                    [&](auto &) {
-                        error(equals, "Invalid assignment target.");
-                        return std::move(expr);
-                    },
-            };
-
-            return std::visit(visitor, expr->expr);
-        }
-
-        return expr;
-    }
-
-    auto expr_or() -> ExprPtr
-    {
-        auto expr = expr_and();
-        if (match(Or)) {
-            return make_unique_expr<expr::Logical>(std::move(expr), previous(), expr_or());
-        }
-        return expr;
-    }
-
-    auto expr_and() -> ExprPtr
-    {
-        auto expr = equality();
-        if (match(And)) {
-            return make_unique_expr<expr::Logical>(std::move(expr), previous(), expr_and());
-        }
-        return expr;
-    }
-
-    auto equality() -> ExprPtr
-    {
-        auto expr = comparison();
-        while (match_any(BangEqual, EqualEqual)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), comparison());
-        }
-        return expr;
-    }
-
-    auto comparison() -> ExprPtr
-    {
-        auto expr = term();
-        while (match_any(Greater, GreaterEqual, Less, LessEqual)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), term());
-        }
-        return expr;
-    }
-
-    auto term() -> ExprPtr
-    {
-        auto expr = factor();
-        while (match_any(Minus, Plus)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), factor());
-        }
-        return expr;
-    }
-
-    auto factor() -> ExprPtr
-    {
-        auto expr = unary();
-        while (match_any(Percent, Slash, Star)) {
-            expr = make_unique_expr<expr::Binary>(std::move(expr), previous(), unary());
-        }
-        return expr;
-    }
-
-    auto unary() -> ExprPtr
-    {
-        if (match_any(Bang, Minus)) {
-            return make_unique_expr<expr::Unary>(previous(), unary());
-        }
-
-        return function_expression();
-    }
-
-    auto function_expression() -> ExprPtr
-    {
-        if (match(Fun)) {
-            const auto & keyword = previous();
-            consume(LeftParenthesis, "Expect '(' after 'fun'.");
-
-            auto params = get_function_parameters();
-
-            consume(LeftBrace, "Expect '{' before function body.");
-            return make_unique_expr<expr::Function>(
-                    keyword, std::move(params), get_block_statements()
-            );
-        }
-
-        return call();
-    }
-
-    auto call() -> ExprPtr
-    {
-        auto expr = primary();
-        SLOC_BARRIER(expr->sloc);
-        while (true) {
-            if (match(LeftParenthesis)) {
-                expr = make_unique_expr<expr::Call>(std::move(expr), get_call_arguments());
-            }
-            else if (match(Dot)) {
-                const auto & name = consume(Identifier, "Expect property name after '.'.");
-                m_op_sloc = name.sloc;
-                if (match(LeftParenthesis)) {
-                    expr = make_unique_expr<expr::Invoke>(
-                            std::move(expr), name, get_call_arguments()
-                    );
-                }
-                else {
-                    expr = make_unique_expr<expr::Get>(std::move(expr), name);
-                }
-            }
-            else {
-                break;
-            }
-        }
-
-        return expr;
-    }
-
-    auto primary() -> ExprPtr
-    {
-        if (match_any(False, True, Nil, Number, String)) {
-            return make_unique_expr<expr::Literal>(previous());
-        }
-
-        if (match(Super)) {
-            const auto & keyword = previous();
-            consume(Dot, "Expect '.' after 'super'.");
-
-            SLOC_BARRIER(peek().sloc);
-
-            auto method_name = consume(Identifier, "Expect superclass method name.");
-            if (match(LeftParenthesis)) {
-                return make_unique_expr<expr::SuperInvoke>(
-                        keyword, method_name, get_call_arguments()
-                );
-            }
-            return make_unique_expr<expr::Super>(keyword, method_name);
-        }
-
-        if (match(This)) {
-            return make_unique_expr<expr::This>(previous());
-        }
-
-        if (match(Identifier)) {
-            return make_unique_expr<expr::Variable>(previous());
-        }
-
-        if (match(LeftParenthesis)) {
-            auto expr = expression();
-            consume(RightParenthesis, "Expect ')' after expression.");
-            return make_unique_expr<expr::Grouping>(std::move(expr));
-        }
-
-        error(peek(), "Expect expression.");
         advance();
-        return make_unique_expr<expr::Invalid>();
+        auto prefix_rule = get_rule(previous().type).prefix;
+        if (prefix_rule == nullptr) {
+            error(previous(), "Expect expression.");
+            return make_unique_expr<expr::Invalid>();
+        }
+
+        bool can_assign = precedence <= Precedence::Assignment;
+        auto expr = (this->*prefix_rule)({.can_assign = can_assign});
+
+        while (precedence <= get_rule(peek().type).precedence) {
+            advance();
+            auto infix_rule = get_rule(previous().type).infix;
+            assert(infix_rule != nullptr);
+            expr = (this->*infix_rule)(std::move(expr), {.can_assign = can_assign});
+        }
+
+        if (can_assign && match(TokenType::Equal)) {
+            error(previous(), "Invalid assignment target.");
+        }
+
+        return expr;
     }
 
     // NOLINTEND(misc-no-recursion)
 
+    auto next_precedence(Precedence precedence) -> Precedence
+    {
+        return static_cast<Precedence>(static_cast<std::uint8_t>(precedence) + 1);
+    }
+
+    // oh my god holy shit
+    consteval static auto generate_rule_table() noexcept
+    {
+        using enum Precedence;
+        std::array<ParseRule, magic_enum::enum_values<TokenType>().size()> rules;
+
+        // clang-format off
+
+        // NOLINTBEGIN(cppcoreguidelines-macro-usage)
+        #define _IS_NULLPTR_CHECK_nullptr // Empty macro to assist with CHECK_EMPTY below
+        #define IS_NULLPTR(val) BOOST_PP_CHECK_EMPTY(_IS_NULLPTR_CHECK_ ## val)
+
+        #define ADD_RULE(token_type, prefix_val, infix_val, precedence_val)                       \
+            rules[static_cast<std::size_t>(TokenType::token_type)] = {                             \
+                    .prefix = BOOST_PP_IIF(IS_NULLPTR(prefix_val), nullptr, &Parser::prefix_val),\
+                    .infix = BOOST_PP_IIF(IS_NULLPTR(infix_val), nullptr, &Parser::infix_val),   \
+                    .precedence = Precedence::precedence_val,                                     \
+            }
+
+        //       Token type     | Prefix fn | Infix fn | Precedence
+        ADD_RULE(And,             nullptr,    logical,   And);
+        ADD_RULE(Bang,            unary,      nullptr,   None);
+        ADD_RULE(BangEqual,       nullptr,    binary,    Equality);
+        ADD_RULE(Dot,             nullptr,    dot,       Call);
+        ADD_RULE(EqualEqual,      nullptr,    binary,    Equality);
+        ADD_RULE(False,           literal,    nullptr,   None);
+        ADD_RULE(Fun,             fun_ex,     nullptr,   None);
+        ADD_RULE(Greater,         nullptr,    binary,    Comparison);
+        ADD_RULE(GreaterEqual,    nullptr,    binary,    Comparison);
+        ADD_RULE(Identifier,      variable,   nullptr,   None);
+        ADD_RULE(LeftParenthesis, grouping,   call,      Call);
+        ADD_RULE(Less,            nullptr,    binary,    Comparison);
+        ADD_RULE(LessEqual,       nullptr,    binary,    Comparison);
+        ADD_RULE(Minus,           unary,      binary,    Term);
+        ADD_RULE(Nil,             literal,    nullptr,   None);
+        ADD_RULE(Number,          literal,    nullptr,   None);
+        ADD_RULE(Or,              nullptr,    logical,   Or);
+        ADD_RULE(Plus,            nullptr,    binary,    Term);
+        ADD_RULE(Slash,           nullptr,    binary,    Factor);
+        ADD_RULE(Star,            nullptr,    binary,    Factor);
+        ADD_RULE(String,          literal,    nullptr,   None);
+        ADD_RULE(Super,           super_ex,   nullptr,   None);
+        ADD_RULE(This,            this_ex,    nullptr,   None);
+        ADD_RULE(True,            literal,    nullptr,   None);
+
+        #undef _IS_NULLPTR_CHECK_nullptr
+        #undef IS_NULLPTR
+        #undef ADD_RULE
+        // NOLINTEND(cppcoreguidelines-macro-usage)
+
+        // clang-format on
+
+        return rules;
+    }
+
+    static auto get_rule(TokenType type) -> const ParseRule &
+    {
+        constexpr static const auto s_rule_table = generate_rule_table();
+        // Accessing a table via TokenType is safe, it has elements precisely for each TokenType
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+        return s_rule_table[static_cast<std::size_t>(type)];
+    }
+
+private:
     std::span<const Token> m_tokens;
     std::size_t m_current = 0;
     SourceLocation m_op_sloc = {.line = 1, .column = 1};
